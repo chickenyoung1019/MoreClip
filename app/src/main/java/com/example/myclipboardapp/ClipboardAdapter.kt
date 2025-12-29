@@ -17,6 +17,7 @@ class ClipboardAdapter(
     private val onEdit: (MemoEntity) -> Unit,
     private val onDelete: (MemoEntity) -> Unit,
     private val onSelectMode: () -> Unit,
+    private val onAddToTemplate: (MemoEntity) -> Unit,
     private val onSelectionChanged: (Set<Int>) -> Unit = {}
 ) : RecyclerView.Adapter<ClipboardAdapter.MemoViewHolder>() {
 
@@ -85,6 +86,10 @@ class ClipboardAdapter(
             when (menuItem.itemId) {
                 R.id.action_edit -> {
                     onEdit(memo)
+                    true
+                }
+                R.id.action_add_to_template -> {
+                    onAddToTemplate(memo)
                     true
                 }
                 R.id.action_delete -> {

@@ -76,6 +76,9 @@ class FolderContentAdapter(
         val popup = PopupMenu(view.context, view)
         popup.menuInflater.inflate(R.menu.memo_item_menu, popup.menu)
 
+        // Hide "定型文に追加" for templates already in template list
+        popup.menu.findItem(R.id.action_add_to_template)?.isVisible = false
+
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.action_edit -> {

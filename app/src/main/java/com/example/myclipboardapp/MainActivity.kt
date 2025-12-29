@@ -263,6 +263,81 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun showFolderSelectionDialogForHistory(historyMemo: MemoEntity) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val folders = db.memoDao().getFolders().toMutableList()
+            folders.add(0, "新しいフォルダを作成")
+            folders.add("フォルダを選択しない")
+
+            val folderArray = folders.toTypedArray()
+
+            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                .setTitle("フォルダを選択")
+                .setItems(folderArray) { _, which ->
+                    when {
+                        which == 0 -> {
+                            // 新しいフォルダを作成
+                            showNewFolderDialogForHistory(historyMemo)
+                        }
+                        which == folderArray.size - 1 -> {
+                            // フォルダを選択しない
+                            addHistoryItemAsTemplate(historyMemo, null)
+                        }
+                        else -> {
+                            // 既存フォルダを選択
+                            addHistoryItemAsTemplate(historyMemo, folderArray[which])
+                        }
+                    }
+                }
+                .setNegativeButton("キャンセル", null)
+                .show()
+        }
+    }
+
+    private fun showNewFolderDialogForHistory(historyMemo: MemoEntity) {
+        val editText = android.widget.EditText(this).apply {
+            hint = "新しいフォルダ名"
+            setPadding(50, 40, 50, 40)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新しいフォルダを作成")
+            .setView(editText)
+            .setPositiveButton("作成") { _, _ ->
+                val folderName = editText.text.toString().trim()
+                if (folderName.isNotEmpty()) {
+                    addHistoryItemAsTemplate(historyMemo, folderName)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+    }
+
+    private fun addHistoryItemAsTemplate(historyMemo: MemoEntity, folder: String?) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val newTemplate = MemoEntity(
+                content = historyMemo.content,
+                isTemplate = true,
+                folder = folder,
+                createdAt = System.currentTimeMillis(),
+                id = 0
+            )
+            db.memoDao().insert(newTemplate)
+
+            // 定型文タブを更新
+            val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+            templateFragment?.loadMemos()
+
+            android.widget.Toast.makeText(
+                this@MainActivity,
+                "定型文に追加しました",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     private fun deleteSelectedItems() {
         when (viewPager.currentItem) {
             0 -> {

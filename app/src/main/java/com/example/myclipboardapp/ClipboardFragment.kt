@@ -44,6 +44,7 @@ class ClipboardFragment : Fragment() {
             onEdit = { memo -> editMemo(memo) },
             onDelete = { memo -> deleteMemo(memo) },
             onSelectMode = { enterSelectMode() },
+            onAddToTemplate = { memo -> addToTemplate(memo) },
             onSelectionChanged = { selectedIds ->
                 (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
             }
@@ -124,6 +125,10 @@ class ClipboardFragment : Fragment() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+    }
+
+    private fun addToTemplate(memo: MemoEntity) {
+        (activity as? MainActivity)?.showFolderSelectionDialogForHistory(memo)
     }
 
     private fun enterSelectMode() {
