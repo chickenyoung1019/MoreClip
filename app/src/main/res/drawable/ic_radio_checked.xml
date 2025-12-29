@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 青い丸 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/primary"/>
+            <size android:width="24dp" android:height="24dp"/>
+        </shape>
+    </item>
+    <!-- 白いチェックマーク -->
+    <item
+        android:width="14dp"
+        android:height="14dp"
+        android:gravity="center">
+        <vector
+            android:width="14dp"
+            android:height="14dp"
+            android:viewportWidth="24"
+            android:viewportHeight="24">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z"/>
+        </vector>
+    </item>
+</layer-list>

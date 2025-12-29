@@ -1,0 +1,34 @@
+package com.example.myclipboardapp
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+
+@Dao
+interface MemoDao {
+    @Insert
+    suspend fun insert(memo: MemoEntity)
+
+    @Query("SELECT * FROM memos ORDER BY createdAt DESC")
+    suspend fun getAllMemos(): List<MemoEntity>
+
+    @Delete
+    suspend fun delete(memo: MemoEntity)
+
+    @Update
+    suspend fun update(memo: MemoEntity)
+
+    // フォルダ一覧を取得（重複なし）
+    @Query("SELECT DISTINCT folder FROM memos WHERE isTemplate = 1 AND folder IS NOT NULL ORDER BY folder")
+    suspend fun getFolders(): List<String>
+
+    // フォルダ内の定型文を取得
+    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder = :folderName ORDER BY createdAt DESC")
+    suspend fun getTemplatesByFolder(folderName: String): List<MemoEntity>
+
+    // フォルダなしの定型文を取得
+    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder IS NULL ORDER BY createdAt DESC")
+    suspend fun getTemplatesWithoutFolder(): List<MemoEntity>
+}
