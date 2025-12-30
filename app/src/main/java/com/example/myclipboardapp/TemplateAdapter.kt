@@ -16,6 +16,7 @@ class TemplateAdapter(
     private val onFolderDelete: (String) -> Unit,
     private val onTemplateEdit: (MemoEntity) -> Unit,
     private val onTemplateDelete: (MemoEntity) -> Unit,
+    private val onTemplateMove: (MemoEntity) -> Unit,
     private val onSelectMode: () -> Unit,
     private val onSelectionChanged: (Set<String>) -> Unit = {}
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -179,7 +180,7 @@ class TemplateAdapter(
                         true
                     }
                     R.id.action_move -> {
-                        // TODO: 移動機能の実装
+                        onTemplateMove(memo)
                         true
                     }
                     R.id.action_delete -> {

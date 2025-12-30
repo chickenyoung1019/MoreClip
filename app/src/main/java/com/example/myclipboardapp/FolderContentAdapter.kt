@@ -16,6 +16,7 @@ class FolderContentAdapter(
     private val onItemClick: (MemoEntity) -> Unit,
     private val onEdit: (MemoEntity) -> Unit,
     private val onDelete: (MemoEntity) -> Unit,
+    private val onMove: (MemoEntity) -> Unit,
     private val onSelectMode: () -> Unit,
     private val onSelectionChanged: (Set<Int>) -> Unit = {}
 ) : RecyclerView.Adapter<FolderContentAdapter.ViewHolder>() {
@@ -83,7 +84,7 @@ class FolderContentAdapter(
                     true
                 }
                 R.id.action_move -> {
-                    // TODO: 移動機能の実装
+                    onMove(memo)
                     true
                 }
                 R.id.action_delete -> {

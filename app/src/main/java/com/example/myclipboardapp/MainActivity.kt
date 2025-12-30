@@ -416,6 +416,81 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun showFolderSelectionDialogForMove(templateMemo: MemoEntity) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val folders = db.memoDao().getFolders().toMutableList()
+            folders.add(0, "新しいフォルダを作成")
+            folders.add("フォルダを選択しない")
+
+            val folderArray = folders.toTypedArray()
+
+            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                .setTitle("移動先を選択")
+                .setItems(folderArray) { _, which ->
+                    when {
+                        which == 0 -> {
+                            // 新しいフォルダを作成
+                            showNewFolderDialogForMove(templateMemo)
+                        }
+                        which == folderArray.size - 1 -> {
+                            // フォルダを選択しない
+                            moveTemplateToFolder(templateMemo, null)
+                        }
+                        else -> {
+                            // 既存フォルダを選択
+                            moveTemplateToFolder(templateMemo, folderArray[which])
+                        }
+                    }
+                }
+                .setNegativeButton("キャンセル", null)
+                .show()
+        }
+    }
+
+    private fun showNewFolderDialogForMove(templateMemo: MemoEntity) {
+        val editText = android.widget.EditText(this).apply {
+            hint = "新しいフォルダ名"
+            setPadding(50, 40, 50, 40)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新しいフォルダを作成")
+            .setView(editText)
+            .setPositiveButton("作成") { _, _ ->
+                val folderName = editText.text.toString().trim()
+                if (folderName.isNotEmpty()) {
+                    moveTemplateToFolder(templateMemo, folderName)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+    }
+
+    private fun moveTemplateToFolder(templateMemo: MemoEntity, folder: String?) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val updatedMemo = templateMemo.copy(folder = folder)
+            db.memoDao().update(updatedMemo)
+
+            // 定型文タブを更新
+            val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+            templateFragment?.loadMemos()
+
+            val message = if (folder != null) {
+                "「$folder」に移動しました"
+            } else {
+                "フォルダから移動しました"
+            }
+
+            android.widget.Toast.makeText(
+                this@MainActivity,
+                message,
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     private fun deleteSelectedItems() {
         when (viewPager.currentItem) {
             0 -> {

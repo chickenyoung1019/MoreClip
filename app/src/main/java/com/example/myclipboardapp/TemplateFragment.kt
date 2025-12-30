@@ -52,6 +52,7 @@ class TemplateFragment : Fragment() {
             onFolderDelete = { folderName -> deleteFolder(folderName) },
             onTemplateEdit = { memo -> editMemo(memo) },
             onTemplateDelete = { memo -> deleteMemo(memo) },
+            onTemplateMove = { memo -> moveTemplate(memo) },
             onSelectMode = { enterSelectModeForList() },
             onSelectionChanged = { selectedIds ->
                 (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
@@ -156,6 +157,7 @@ class TemplateFragment : Fragment() {
                     onItemClick = { memo -> copyToClipboard(memo.content) },
                     onEdit = { memo -> editMemo(memo) },
                     onDelete = { memo -> deleteMemo(memo) },
+                    onMove = { memo -> moveTemplate(memo) },
                     onSelectMode = { enterSelectMode() },
                     onSelectionChanged = { selectedIds ->
                         (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
@@ -211,6 +213,10 @@ class TemplateFragment : Fragment() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+    }
+
+    private fun moveTemplate(memo: MemoEntity) {
+        (activity as? MainActivity)?.showFolderSelectionDialogForMove(memo)
     }
 
     private fun openFolder(folderName: String) {
