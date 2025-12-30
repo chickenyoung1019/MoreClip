@@ -80,7 +80,7 @@ class ClipboardAdapter(
 
     private fun showPopupMenu(view: View, memo: MemoEntity) {
         val popup = PopupMenu(view.context, view)
-        popup.menuInflater.inflate(R.menu.memo_item_menu, popup.menu)
+        popup.menuInflater.inflate(R.menu.clipboard_menu, popup.menu)
 
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {

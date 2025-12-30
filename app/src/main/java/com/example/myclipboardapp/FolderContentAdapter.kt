@@ -74,15 +74,16 @@ class FolderContentAdapter(
 
     private fun showPopupMenu(view: View, memo: MemoEntity) {
         val popup = PopupMenu(view.context, view)
-        popup.menuInflater.inflate(R.menu.memo_item_menu, popup.menu)
-
-        // Hide "定型文に追加" for templates already in template list
-        popup.menu.findItem(R.id.action_add_to_template)?.isVisible = false
+        popup.menuInflater.inflate(R.menu.template_menu, popup.menu)
 
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.action_edit -> {
                     onEdit(memo)
+                    true
+                }
+                R.id.action_move -> {
+                    // TODO: 移動機能の実装
                     true
                 }
                 R.id.action_delete -> {

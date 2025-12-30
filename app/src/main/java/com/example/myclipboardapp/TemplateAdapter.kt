@@ -170,12 +170,16 @@ class TemplateAdapter(
 
         private fun showPopupMenu(view: View, memo: MemoEntity) {
             val popup = PopupMenu(view.context, view)
-            popup.menuInflater.inflate(R.menu.memo_item_menu, popup.menu)
+            popup.menuInflater.inflate(R.menu.template_menu, popup.menu)
 
             popup.setOnMenuItemClickListener { menuItem ->
                 when (menuItem.itemId) {
                     R.id.action_edit -> {
                         onTemplateEdit(memo)
+                        true
+                    }
+                    R.id.action_move -> {
+                        // TODO: 移動機能の実装
                         true
                     }
                     R.id.action_delete -> {
