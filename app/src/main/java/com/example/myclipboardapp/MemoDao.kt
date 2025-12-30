@@ -24,11 +24,15 @@ interface MemoDao {
     @Query("SELECT DISTINCT folder FROM memos WHERE isTemplate = 1 AND folder IS NOT NULL ORDER BY folder")
     suspend fun getFolders(): List<String>
 
-    // フォルダ内の定型文を取得
-    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder = :folderName ORDER BY createdAt DESC")
+    // 履歴を取得（並び替えなし）
+    @Query("SELECT * FROM memos WHERE isTemplate = 0")
+    suspend fun getHistoryMemos(): List<MemoEntity>
+
+    // フォルダ内の定型文を取得（並び替えなし）
+    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder = :folderName")
     suspend fun getTemplatesByFolder(folderName: String): List<MemoEntity>
 
-    // フォルダなしの定型文を取得
-    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder IS NULL ORDER BY createdAt DESC")
+    // フォルダなしの定型文を取得（並び替えなし）
+    @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder IS NULL")
     suspend fun getTemplatesWithoutFolder(): List<MemoEntity>
 }

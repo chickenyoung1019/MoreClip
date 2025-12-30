@@ -156,6 +156,10 @@ class MainActivity : AppCompatActivity() {
                     }
                     true
                 }
+                R.id.action_sort -> {
+                    showSortDialog()
+                    true
+                }
                 R.id.action_settings -> {
                     val settingsIntent = when (viewPager.currentItem) {
                         0 -> Intent(this, ClipboardSettingsActivity::class.java)
@@ -169,6 +173,38 @@ class MainActivity : AppCompatActivity() {
             }
         }
         popup.show()
+    }
+
+    private fun showSortDialog() {
+        val prefsName = when (viewPager.currentItem) {
+            0 -> "app_settings"
+            1 -> "template_settings"
+            else -> "app_settings"
+        }
+
+        val prefs = getSharedPreferences(prefsName, MODE_PRIVATE)
+        val currentSort = prefs.getString("sort_order", "newest") ?: "newest"
+
+        val sortOptions = arrayOf("新しい順", "古い順", "名前順")
+        val sortValues = arrayOf("newest", "oldest", "name")
+        val checkedItem = sortValues.indexOf(currentSort)
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("並び替え")
+            .setSingleChoiceItems(sortOptions, checkedItem) { dialog, which ->
+                val selectedSort = sortValues[which]
+                prefs.edit().putString("sort_order", selectedSort).apply()
+
+                // リストを更新
+                when (viewPager.currentItem) {
+                    0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.loadMemos()
+                    1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.loadMemos()
+                }
+
+                dialog.dismiss()
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
     }
 
     private fun showAddTemplateDialog() {

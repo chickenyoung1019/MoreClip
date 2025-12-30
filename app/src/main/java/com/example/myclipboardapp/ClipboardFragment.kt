@@ -59,18 +59,28 @@ class ClipboardFragment : Fragment() {
         loadMemos()
     }
 
-    private fun loadMemos() {
+    fun loadMemos() {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            val memos = db.memoDao().getAllMemos().filter { !it.isTemplate }
+            val prefs = requireContext().getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val sortOrder = prefs.getString("sort_order", "newest") ?: "newest"
 
-            if (memos.isEmpty()) {
+            val memos = db.memoDao().getHistoryMemos()
+
+            // 並び替え適用
+            val sortedMemos = when (sortOrder) {
+                "oldest" -> memos.sortedBy { it.createdAt }
+                "name" -> memos.sortedBy { it.content }
+                else -> memos.sortedByDescending { it.createdAt } // "newest"
+            }
+
+            if (sortedMemos.isEmpty()) {
                 recyclerView.visibility = View.GONE
                 emptyText.visibility = View.VISIBLE
             } else {
                 recyclerView.visibility = View.VISIBLE
                 emptyText.visibility = View.GONE
-                adapter.updateData(memos)
+                adapter.updateData(sortedMemos)
             }
         }
     }

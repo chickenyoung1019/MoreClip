@@ -67,6 +67,8 @@ class TemplateFragment : Fragment() {
     fun loadMemos() {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
+            val prefs = requireContext().getSharedPreferences("template_settings", Context.MODE_PRIVATE)
+            val sortOrder = prefs.getString("sort_order", "newest") ?: "newest"
 
             if (currentFolder == null) {
                 // フォルダ一覧表示
@@ -79,7 +81,15 @@ class TemplateFragment : Fragment() {
                 }
 
                 val templatesWithoutFolder = db.memoDao().getTemplatesWithoutFolder()
-                templatesWithoutFolder.forEach { memo ->
+
+                // 定型文を並び替え
+                val sortedTemplates = when (sortOrder) {
+                    "oldest" -> templatesWithoutFolder.sortedBy { it.createdAt }
+                    "name" -> templatesWithoutFolder.sortedBy { it.content }
+                    else -> templatesWithoutFolder.sortedByDescending { it.createdAt } // "newest"
+                }
+
+                sortedTemplates.forEach { memo ->
                     templateItems.add(TemplateItem.Template(memo))
                 }
 
@@ -95,10 +105,17 @@ class TemplateFragment : Fragment() {
                 // フォルダ内容表示
                 val memos = db.memoDao().getTemplatesByFolder(currentFolder!!)
 
+                // 並び替え適用
+                val sortedMemos = when (sortOrder) {
+                    "oldest" -> memos.sortedBy { it.createdAt }
+                    "name" -> memos.sortedBy { it.content }
+                    else -> memos.sortedByDescending { it.createdAt } // "newest"
+                }
+
                 // FolderContentAdapterに切り替え
                 if (folderContentAdapter == null) {
                     folderContentAdapter = FolderContentAdapter(
-                        memos = memos,
+                        memos = sortedMemos,
                         onItemClick = { memo -> copyToClipboard(memo.content) },
                         onEdit = { memo -> editMemo(memo) },
                         onDelete = { memo -> deleteMemo(memo) },
@@ -109,10 +126,10 @@ class TemplateFragment : Fragment() {
                     )
                     recyclerView.adapter = folderContentAdapter
                 } else {
-                    folderContentAdapter?.updateData(memos)
+                    folderContentAdapter?.updateData(sortedMemos)
                 }
 
-                if (memos.isEmpty()) {
+                if (sortedMemos.isEmpty()) {
                     recyclerView.visibility = View.GONE
                     emptyText.visibility = View.VISIBLE
                 } else {

@@ -7,6 +7,9 @@
         android:id="@+id/action_deselect_all"
         android:title="すべて解除" />
     <item
+        android:id="@+id/action_sort"
+        android:title="並び替え" />
+    <item
         android:id="@+id/action_settings"
         android:title="設定" />
 </menu>
