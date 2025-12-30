@@ -121,6 +121,7 @@ class TemplateAdapter(
                     }
                     R.id.action_select_mode -> {
                         onSelectMode()
+                        toggleSelection("folder:$folderName")
                         true
                     }
                     else -> false
@@ -189,6 +190,7 @@ class TemplateAdapter(
                     }
                     R.id.action_select_mode -> {
                         onSelectMode()
+                        toggleSelection("template:${memo.id}")
                         true
                     }
                     else -> false

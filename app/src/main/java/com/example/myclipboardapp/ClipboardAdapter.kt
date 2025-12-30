@@ -98,6 +98,7 @@ class ClipboardAdapter(
                 }
                 R.id.action_select_mode -> {
                     onSelectMode()
+                    toggleSelection(memo.id)
                     true
                 }
                 else -> false

@@ -169,10 +169,34 @@ class MainActivity : AppCompatActivity() {
         popup.menu.findItem(R.id.action_select_all)?.isVisible = !isAllSelected
         popup.menu.findItem(R.id.action_deselect_all)?.isVisible = isAllSelected
 
+        // 履歴タブの場合、選択モード時のみ「定型文に追加」を表示
+        if (viewPager.currentItem == 0) {
+            val hasSelection = (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.getSelectedItems()?.isNotEmpty() == true
+            popup.menu.findItem(R.id.action_add_selected_to_template)?.isVisible = hasSelection
+        }
+
         // フォルダ内でのみ「フォルダ名を変更」を表示
         val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
         val isInFolder = templateFragment?.isInFolder() ?: false
         popup.menu.findItem(R.id.action_rename_folder)?.isVisible = isInFolder
+
+        // 定型文タブの場合、選択内容に応じて「移動」を表示
+        if (viewPager.currentItem == 1) {
+            val selectedItems = templateFragment?.getSelectedItems()
+            if (selectedItems != null && selectedItems.isNotEmpty()) {
+                if (isInFolder) {
+                    // フォルダ内：全てテンプレートなので常に表示
+                    popup.menu.findItem(R.id.action_move_selected)?.isVisible = true
+                } else {
+                    // フォルダ一覧：フォルダが含まれていなければ表示
+                    val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } ?: false
+                    popup.menu.findItem(R.id.action_move_selected)?.isVisible = !hasFolder
+                }
+            } else {
+                // 未選択時は非表示
+                popup.menu.findItem(R.id.action_move_selected)?.isVisible = false
+            }
+        }
 
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
@@ -196,6 +220,14 @@ class MainActivity : AppCompatActivity() {
                         0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.deselectAll()
                         1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.deselectAll()  // ← 追加
                     }
+                    true
+                }
+                R.id.action_add_selected_to_template -> {
+                    addSelectedHistoryToTemplate()
+                    true
+                }
+                R.id.action_move_selected -> {
+                    moveSelectedTemplates()
                     true
                 }
                 R.id.action_sort -> {
@@ -486,6 +518,216 @@ class MainActivity : AppCompatActivity() {
             android.widget.Toast.makeText(
                 this@MainActivity,
                 message,
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun addSelectedHistoryToTemplate() {
+        val clipboardFragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
+        val selectedIds = clipboardFragment?.getSelectedItems() ?: return
+        if (selectedIds.isEmpty()) return
+
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val allMemos = db.memoDao().getAllMemos()
+            val selectedMemos = allMemos.filter { (selectedIds as Set<Int>).contains(it.id) }
+
+            if (selectedMemos.size == 1) {
+                // 1件のみの場合は既存のダイアログを使用
+                showFolderSelectionDialogForHistory(selectedMemos[0])
+            } else {
+                // 複数件の場合は一括追加用のダイアログ
+                showFolderSelectionDialogForMultiple(selectedMemos)
+            }
+        }
+    }
+
+    private fun showFolderSelectionDialogForMultiple(historyMemos: List<MemoEntity>) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val folders = db.memoDao().getFolders().toMutableList()
+            folders.add(0, "新しいフォルダを作成")
+            folders.add("フォルダを選択しない")
+
+            val folderArray = folders.toTypedArray()
+
+            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                .setTitle("フォルダを選択（${historyMemos.size}件）")
+                .setItems(folderArray) { _, which ->
+                    when {
+                        which == 0 -> {
+                            // 新しいフォルダを作成
+                            showNewFolderDialogForMultiple(historyMemos)
+                        }
+                        which == folderArray.size - 1 -> {
+                            // フォルダを選択しない
+                            addMultipleHistoryItemsAsTemplate(historyMemos, null)
+                        }
+                        else -> {
+                            // 既存フォルダを選択
+                            addMultipleHistoryItemsAsTemplate(historyMemos, folderArray[which])
+                        }
+                    }
+                }
+                .setNegativeButton("キャンセル", null)
+                .show()
+        }
+    }
+
+    private fun showNewFolderDialogForMultiple(historyMemos: List<MemoEntity>) {
+        val editText = android.widget.EditText(this).apply {
+            hint = "新しいフォルダ名"
+            setPadding(50, 40, 50, 40)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新しいフォルダを作成")
+            .setView(editText)
+            .setPositiveButton("作成") { _, _ ->
+                val folderName = editText.text.toString().trim()
+                if (folderName.isNotEmpty()) {
+                    addMultipleHistoryItemsAsTemplate(historyMemos, folderName)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+    }
+
+    private fun addMultipleHistoryItemsAsTemplate(historyMemos: List<MemoEntity>, folder: String?) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+
+            historyMemos.forEach { historyMemo ->
+                val newTemplate = MemoEntity(
+                    content = historyMemo.content,
+                    isTemplate = true,
+                    folder = folder,
+                    createdAt = System.currentTimeMillis(),
+                    id = 0
+                )
+                db.memoDao().insert(newTemplate)
+            }
+
+            // 定型文タブを更新
+            val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+            templateFragment?.loadMemos()
+
+            // 選択モード解除
+            val clipboardFragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
+            clipboardFragment?.exitSelectMode()
+            deleteButton.visibility = View.GONE
+
+            android.widget.Toast.makeText(
+                this@MainActivity,
+                "${historyMemos.size}件を定型文に追加しました",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun moveSelectedTemplates() {
+        val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+        val selectedItems = templateFragment?.getSelectedItems() ?: return
+        if (selectedItems.isEmpty()) return
+
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val allMemos = db.memoDao().getAllMemos()
+
+            // 選択内容からテンプレートIDを抽出
+            val selectedMemos = if (selectedItems.first() is String) {
+                // フォルダ一覧の場合：Set<String> ("template:id"形式)
+                val templateIds = (selectedItems as Set<String>)
+                    .filter { it.startsWith("template:") }
+                    .map { it.removePrefix("template:").toInt() }
+                allMemos.filter { templateIds.contains(it.id) }
+            } else {
+                // フォルダ内の場合：Set<Int>
+                allMemos.filter { (selectedItems as Set<Int>).contains(it.id) }
+            }
+
+            if (selectedMemos.size == 1) {
+                // 1件のみの場合は既存のダイアログを使用
+                showFolderSelectionDialogForMove(selectedMemos[0])
+            } else {
+                // 複数件の場合は一括移動用のダイアログ
+                showFolderSelectionDialogForMoveMultiple(selectedMemos)
+            }
+        }
+    }
+
+    private fun showFolderSelectionDialogForMoveMultiple(templates: List<MemoEntity>) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+            val folders = db.memoDao().getFolders().toMutableList()
+            folders.add(0, "新しいフォルダを作成")
+            folders.add("フォルダを選択しない")
+
+            val folderArray = folders.toTypedArray()
+
+            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                .setTitle("フォルダを選択（${templates.size}件）")
+                .setItems(folderArray) { _, which ->
+                    when {
+                        which == 0 -> {
+                            // 新しいフォルダを作成
+                            showNewFolderDialogForMoveMultiple(templates)
+                        }
+                        which == folderArray.size - 1 -> {
+                            // フォルダを選択しない
+                            moveMultipleTemplates(templates, null)
+                        }
+                        else -> {
+                            // 既存フォルダを選択
+                            moveMultipleTemplates(templates, folderArray[which])
+                        }
+                    }
+                }
+                .setNegativeButton("キャンセル", null)
+                .show()
+        }
+    }
+
+    private fun showNewFolderDialogForMoveMultiple(templates: List<MemoEntity>) {
+        val editText = android.widget.EditText(this).apply {
+            hint = "新しいフォルダ名"
+            setPadding(50, 40, 50, 40)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新しいフォルダを作成")
+            .setView(editText)
+            .setPositiveButton("作成") { _, _ ->
+                val folderName = editText.text.toString().trim()
+                if (folderName.isNotEmpty()) {
+                    moveMultipleTemplates(templates, folderName)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+    }
+
+    private fun moveMultipleTemplates(templates: List<MemoEntity>, folder: String?) {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(applicationContext)
+
+            templates.forEach { template ->
+                val updated = template.copy(folder = folder)
+                db.memoDao().update(updated)
+            }
+
+            // 定型文タブを更新
+            val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+            templateFragment?.loadMemos()
+
+            // 選択モード解除
+            templateFragment?.exitSelectMode()
+            deleteButton.visibility = View.GONE
+
+            android.widget.Toast.makeText(
+                this@MainActivity,
+                "${templates.size}件を移動しました",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }

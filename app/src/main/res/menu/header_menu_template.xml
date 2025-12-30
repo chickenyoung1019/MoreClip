@@ -13,6 +13,9 @@
         android:id="@+id/action_deselect_all"
         android:title="すべて解除" />
     <item
+        android:id="@+id/action_move_selected"
+        android:title="移動" />
+    <item
         android:id="@+id/action_sort"
         android:title="並び替え" />
     <item

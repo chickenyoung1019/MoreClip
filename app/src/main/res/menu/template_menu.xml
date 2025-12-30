@@ -7,9 +7,9 @@
         android:id="@+id/action_move"
         android:title="移動" />
     <item
+        android:id="@+id/action_select_mode"
+        android:title="選択" />
+    <item
         android:id="@+id/action_delete"
         android:title="削除" />
-    <item
-        android:id="@+id/action_select_mode"
-        android:title="選択削除" />
 </menu>
