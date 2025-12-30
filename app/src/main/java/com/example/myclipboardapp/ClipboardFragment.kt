@@ -22,6 +22,8 @@ class ClipboardFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyText: TextView
     private lateinit var adapter: ClipboardAdapter
+    private var allMemos: List<MemoEntity> = emptyList()
+    private var currentSearchQuery: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -68,20 +70,33 @@ class ClipboardFragment : Fragment() {
             val memos = db.memoDao().getHistoryMemos()
 
             // 並び替え適用
-            val sortedMemos = when (sortOrder) {
+            allMemos = when (sortOrder) {
                 "oldest" -> memos.sortedBy { it.createdAt }
                 "name" -> memos.sortedBy { it.content }
                 else -> memos.sortedByDescending { it.createdAt } // "newest"
             }
 
-            if (sortedMemos.isEmpty()) {
-                recyclerView.visibility = View.GONE
-                emptyText.visibility = View.VISIBLE
-            } else {
-                recyclerView.visibility = View.VISIBLE
-                emptyText.visibility = View.GONE
-                adapter.updateData(sortedMemos)
-            }
+            // 検索フィルターを適用
+            filterMemos(currentSearchQuery)
+        }
+    }
+
+    fun filterMemos(query: String) {
+        currentSearchQuery = query
+
+        val filteredMemos = if (query.isEmpty()) {
+            allMemos
+        } else {
+            allMemos.filter { it.content.contains(query, ignoreCase = true) }
+        }
+
+        if (filteredMemos.isEmpty()) {
+            recyclerView.visibility = View.GONE
+            emptyText.visibility = View.VISIBLE
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            emptyText.visibility = View.GONE
+            adapter.updateData(filteredMemos)
         }
     }
 

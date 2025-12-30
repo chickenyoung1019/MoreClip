@@ -25,6 +25,9 @@ class TemplateFragment : Fragment() {
     private var currentFolder: String? = null  // null = フォルダ一覧表示中
     private lateinit var backButton: View  // 戻るボタン（後で追加）
     private var folderContentAdapter: FolderContentAdapter? = null
+    private var allTemplateItems: List<TemplateItem> = emptyList()
+    private var allFolderMemos: List<MemoEntity> = emptyList()
+    private var currentSearchQuery: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -93,49 +96,82 @@ class TemplateFragment : Fragment() {
                     templateItems.add(TemplateItem.Template(memo))
                 }
 
-                if (templateItems.isEmpty()) {
-                    recyclerView.visibility = View.GONE
-                    emptyText.visibility = View.VISIBLE
-                } else {
-                    recyclerView.visibility = View.VISIBLE
-                    emptyText.visibility = View.GONE
-                    adapter.updateData(templateItems)
-                }
+                allTemplateItems = templateItems
+
+                // 検索フィルターを適用
+                filterMemos(currentSearchQuery)
             } else {
                 // フォルダ内容表示
                 val memos = db.memoDao().getTemplatesByFolder(currentFolder!!)
 
                 // 並び替え適用
-                val sortedMemos = when (sortOrder) {
+                allFolderMemos = when (sortOrder) {
                     "oldest" -> memos.sortedBy { it.createdAt }
                     "name" -> memos.sortedBy { it.content }
                     else -> memos.sortedByDescending { it.createdAt } // "newest"
                 }
 
-                // FolderContentAdapterに切り替え
-                if (folderContentAdapter == null) {
-                    folderContentAdapter = FolderContentAdapter(
-                        memos = sortedMemos,
-                        onItemClick = { memo -> copyToClipboard(memo.content) },
-                        onEdit = { memo -> editMemo(memo) },
-                        onDelete = { memo -> deleteMemo(memo) },
-                        onSelectMode = { enterSelectMode() },
-                        onSelectionChanged = { selectedIds ->
-                            (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
-                        }
-                    )
-                    recyclerView.adapter = folderContentAdapter
-                } else {
-                    folderContentAdapter?.updateData(sortedMemos)
-                }
+                // 検索フィルターを適用
+                filterMemos(currentSearchQuery)
+            }
+        }
+    }
 
-                if (sortedMemos.isEmpty()) {
-                    recyclerView.visibility = View.GONE
-                    emptyText.visibility = View.VISIBLE
-                } else {
-                    recyclerView.visibility = View.VISIBLE
-                    emptyText.visibility = View.GONE
+    fun filterMemos(query: String) {
+        currentSearchQuery = query
+
+        if (currentFolder == null) {
+            // フォルダ一覧の検索
+            val filteredItems = if (query.isEmpty()) {
+                allTemplateItems
+            } else {
+                allTemplateItems.filter { item ->
+                    when (item) {
+                        is TemplateItem.Folder -> item.name.contains(query, ignoreCase = true)
+                        is TemplateItem.Template -> item.memo.content.contains(query, ignoreCase = true)
+                    }
                 }
+            }
+
+            if (filteredItems.isEmpty()) {
+                recyclerView.visibility = View.GONE
+                emptyText.visibility = View.VISIBLE
+            } else {
+                recyclerView.visibility = View.VISIBLE
+                emptyText.visibility = View.GONE
+                adapter.updateData(filteredItems)
+            }
+        } else {
+            // フォルダ内の検索
+            val filteredMemos = if (query.isEmpty()) {
+                allFolderMemos
+            } else {
+                allFolderMemos.filter { it.content.contains(query, ignoreCase = true) }
+            }
+
+            // FolderContentAdapterに切り替え
+            if (folderContentAdapter == null) {
+                folderContentAdapter = FolderContentAdapter(
+                    memos = filteredMemos,
+                    onItemClick = { memo -> copyToClipboard(memo.content) },
+                    onEdit = { memo -> editMemo(memo) },
+                    onDelete = { memo -> deleteMemo(memo) },
+                    onSelectMode = { enterSelectMode() },
+                    onSelectionChanged = { selectedIds ->
+                        (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
+                    }
+                )
+                recyclerView.adapter = folderContentAdapter
+            } else {
+                folderContentAdapter?.updateData(filteredMemos)
+            }
+
+            if (filteredMemos.isEmpty()) {
+                recyclerView.visibility = View.GONE
+                emptyText.visibility = View.VISIBLE
+            } else {
+                recyclerView.visibility = View.VISIBLE
+                emptyText.visibility = View.GONE
             }
         }
     }

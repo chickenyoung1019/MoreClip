@@ -16,7 +16,7 @@
         android:paddingStart="16dp"
         android:paddingEnd="16dp">
 
-        <!-- 戻るボタン（最初は非表示） -->
+        <!-- 戻るボタン（フォルダ内 or 検索時に表示） -->
         <ImageView
             android:id="@+id/backButton"
             android:layout_width="24dp"
@@ -25,7 +25,7 @@
             android:visibility="gone"
             android:contentDescription="戻る" />
 
-        <!-- タイトル（IDを追加） -->
+        <!-- タイトル -->
         <TextView
             android:id="@+id/headerTitle"
             android:layout_width="0dp"
@@ -37,6 +37,18 @@
             android:textColor="#000000"
             android:textStyle="bold" />
 
+        <!-- SearchView（検索時のみ表示） -->
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:background="#E6F0F9"
+            android:iconifiedByDefault="false"
+            android:queryHint="検索..."
+            android:visibility="gone" />
+
         <!-- ゴミ箱 -->
         <ImageView
             android:id="@+id/deleteButton"
@@ -45,6 +57,15 @@
             android:src="@drawable/ic_delete"
             android:visibility="gone"
             android:contentDescription="削除" />
+
+        <!-- 検索 -->
+        <ImageView
+            android:id="@+id/searchButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_search"
+            android:layout_marginStart="16dp"
+            android:contentDescription="検索" />
 
         <!-- ︙ -->
         <ImageView

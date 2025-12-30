@@ -22,6 +22,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pagerAdapter: ViewPagerAdapter
     private lateinit var backButton: ImageView
     private lateinit var headerTitle: TextView
+    private lateinit var searchButton: ImageView
+    private lateinit var searchView: androidx.appcompat.widget.SearchView
+    private var isSearchMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,10 +36,37 @@ class MainActivity : AppCompatActivity() {
         deleteButton = findViewById(R.id.deleteButton)
         backButton = findViewById(R.id.backButton)
         headerTitle = findViewById(R.id.headerTitle)
+        searchButton = findViewById(R.id.searchButton)
+        searchView = findViewById(R.id.searchView)
 
         backButton.setOnClickListener {
-            onBackButtonClicked()
+            if (isSearchMode) {
+                hideSearchBar()
+            } else {
+                onBackButtonClicked()
+            }
         }
+
+        // 検索ボタン
+        searchButton.setOnClickListener {
+            showSearchBar()
+        }
+
+        // 検索クエリリスナー
+        searchView.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                // 決定ボタン押下時：キーボードだけ閉じる
+                searchView.clearFocus()
+                val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(searchView.windowToken, 0)
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                performSearch(newText ?: "")
+                return true
+            }
+        })
 
         // ViewPager設定
         pagerAdapter = ViewPagerAdapter(this)
@@ -65,6 +95,12 @@ class MainActivity : AppCompatActivity() {
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
+
+                // 検索モード解除
+                if (isSearchMode) {
+                    hideSearchBar()
+                }
+
                 when (position) {
                     0 -> {
                         val fragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
@@ -81,6 +117,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        // 検索モード中なら検索解除
+        if (isSearchMode) {
+            hideSearchBar()
+            return
+        }
+
         // フォルダモード中なら戻る
         if (backButton.visibility == View.VISIBLE) {
             onBackButtonClicked()
@@ -400,6 +442,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showFolderMode(folderName: String) {
+        // 検索モード解除
+        if (isSearchMode) {
+            hideSearchBar()
+        }
+
         backButton.visibility = View.VISIBLE
         headerTitle.text = folderName
     }
@@ -431,6 +478,62 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+    }
+
+    private fun showSearchBar() {
+        isSearchMode = true
+
+        // タイトル非表示、SearchView表示
+        headerTitle.visibility = View.GONE
+        searchView.visibility = View.VISIBLE
+
+        // 戻るボタン表示、検索・メニューボタン非表示
+        backButton.visibility = View.VISIBLE
+        searchButton.visibility = View.GONE
+        headerMenuButton.visibility = View.GONE
+
+        // キーボード表示（少し遅延させる）
+        searchView.post {
+            searchView.isIconified = false
+            searchView.requestFocus()
+        }
+    }
+
+    private fun hideSearchBar() {
+        isSearchMode = false
+
+        // SearchView非表示、タイトル表示
+        searchView.visibility = View.GONE
+        headerTitle.visibility = View.VISIBLE
+
+        // フォルダモード中かチェック
+        val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+        val isInFolder = templateFragment?.isInFolder() ?: false
+
+        // 戻るボタンはフォルダモード時のみ表示
+        backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
+
+        // 検索・メニューボタン表示
+        searchButton.visibility = View.VISIBLE
+        headerMenuButton.visibility = View.VISIBLE
+
+        // 検索クリア
+        searchView.setQuery("", false)
+        searchView.clearFocus()
+
+        // キーボード非表示
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(searchView.windowToken, 0)
+
+        // 検索をクリア
+        performSearch("")
+    }
+
+    private fun performSearch(query: String) {
+        when (viewPager.currentItem) {
+            0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.filterMemos(query)
+            1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.filterMemos(query)
+        }
     }
 
 }
