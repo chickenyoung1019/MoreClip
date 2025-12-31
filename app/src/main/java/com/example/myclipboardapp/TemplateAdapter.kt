@@ -140,6 +140,11 @@ class TemplateAdapter(
             contentText.text = template.memo.content
             dateText.text = ""
 
+            // 表示行数設定を反映
+            val prefs = itemView.context.getSharedPreferences("template_settings", android.content.Context.MODE_PRIVATE)
+            val maxLines = prefs.getInt("max_lines", 3)
+            contentText.maxLines = maxLines
+
             val itemKey = "template:${template.memo.id}"
 
             if (isSelectMode) {

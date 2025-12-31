@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="max_lines_options">
+        <item>1行</item>
+        <item>2行</item>
+        <item>3行</item>
+        <item>4行</item>
+        <item>5行</item>
+    </string-array>
+</resources>

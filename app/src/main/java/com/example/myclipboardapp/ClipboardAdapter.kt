@@ -40,6 +40,11 @@ class ClipboardAdapter(
         val memo = memos[position]
         holder.contentText.text = memo.content
 
+        // 表示行数設定を反映
+        val prefs = holder.itemView.context.getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE)
+        val maxLines = prefs.getInt("max_lines", 3)
+        holder.contentText.maxLines = maxLines
+
         val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
         holder.dateText.text = dateFormat.format(Date(memo.createdAt))
 

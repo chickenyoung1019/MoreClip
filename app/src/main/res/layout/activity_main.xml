@@ -4,8 +4,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FFFFFF"
+    android:background="#E6F0F9"
     android:fitsSystemWindows="true">
+
+    <!-- バナー広告スペース（将来実装用） -->
+    <FrameLayout
+        android:id="@+id/adBannerContainer"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:background="#FFFFFF"
+        android:visibility="visible" />
 
     <!-- ヘッダー -->
     <LinearLayout
