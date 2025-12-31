@@ -401,7 +401,7 @@ class TemplateFragment : Fragment() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
             .setTitle("フォルダ名を変更")
             .setView(editText)
             .setPositiveButton("変更") { _, _ ->
@@ -412,6 +412,12 @@ class TemplateFragment : Fragment() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun deleteFolder(folderName: String) {

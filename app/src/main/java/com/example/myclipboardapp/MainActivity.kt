@@ -287,7 +287,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("定型文を追加")
             .setView(editText)
             .setPositiveButton("次へ") { _, _ ->
@@ -298,6 +298,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun showFolderSelectionDialog(templateText: String) {
@@ -338,7 +344,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("新しいフォルダを作成")
             .setView(editText)
             .setPositiveButton("作成") { _, _ ->
@@ -349,6 +355,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addTemplateWithFolder(text: String, folder: String?) {
@@ -411,7 +423,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("新しいフォルダを作成")
             .setView(editText)
             .setPositiveButton("作成") { _, _ ->
@@ -422,6 +434,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addHistoryItemAsTemplate(historyMemo: MemoEntity, folder: String?) {
@@ -486,7 +504,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("新しいフォルダを作成")
             .setView(editText)
             .setPositiveButton("作成") { _, _ ->
@@ -497,6 +515,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun moveTemplateToFolder(templateMemo: MemoEntity, folder: String?) {
@@ -581,7 +605,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("新しいフォルダを作成")
             .setView(editText)
             .setPositiveButton("作成") { _, _ ->
@@ -592,6 +616,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addMultipleHistoryItemsAsTemplate(historyMemos: List<MemoEntity>, folder: String?) {
@@ -695,7 +725,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("新しいフォルダを作成")
             .setView(editText)
             .setPositiveButton("作成") { _, _ ->
@@ -706,6 +736,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun moveMultipleTemplates(templates: List<MemoEntity>, folder: String?) {
@@ -784,7 +820,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 40, 50, 40)
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("フォルダ名を変更")
             .setView(editText)
             .setPositiveButton("変更") { _, _ ->
@@ -795,6 +831,12 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun showSearchBar() {
