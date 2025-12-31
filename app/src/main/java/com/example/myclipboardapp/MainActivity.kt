@@ -101,6 +101,14 @@ class MainActivity : AppCompatActivity() {
                     hideSearchBar()
                 }
 
+                // 定型文タブ以外に移動した時、フォルダモードを終了
+                if (position != 1) {
+                    val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+                    if (templateFragment?.isInFolder() == true) {
+                        templateFragment.exitFolder()
+                    }
+                }
+
                 when (position) {
                     0 -> {
                         val fragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
