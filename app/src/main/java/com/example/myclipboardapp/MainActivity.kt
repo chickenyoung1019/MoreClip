@@ -19,8 +19,11 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.AdSize
 import android.content.Context
 import java.util.Calendar
+import android.widget.FrameLayout
 
 class MainActivity : AppCompatActivity() {
 
@@ -40,6 +43,7 @@ class MainActivity : AppCompatActivity() {
 
     // 広告関連
     private var interstitialAd: InterstitialAd? = null
+    private var bannerAdView: AdView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -159,7 +163,10 @@ class MainActivity : AppCompatActivity() {
         // AdMob初期化
         MobileAds.initialize(this) {}
 
-        // 広告表示チェック
+        // バナー広告読み込み
+        loadBannerAd()
+
+        // インタースティシャル広告表示チェック
         checkAndShowAd()
     }
 
@@ -1105,8 +1112,8 @@ class MainActivity : AppCompatActivity() {
     // インタースティシャル広告を読み込む
     private fun loadInterstitialAd() {
         val adRequest = AdRequest.Builder().build()
-        // テスト広告ID
-        val adUnitId = "ca-app-pub-3940256099942544/1033173712"
+        // 本番広告ID
+        val adUnitId = "ca-app-pub-5377681981369299/4938073190"
 
         InterstitialAd.load(this, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
@@ -1156,6 +1163,25 @@ class MainActivity : AppCompatActivity() {
             putString("last_ad_date", currentDate)
             apply()
         }
+    }
+
+    // バナー広告を読み込む
+    private fun loadBannerAd() {
+        val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
+
+        // AdViewを作成
+        bannerAdView = AdView(this).apply {
+            adUnitId = "ca-app-pub-5377681981369299/6584173262" // 本番バナー広告ID
+            setAdSize(AdSize.BANNER)
+        }
+
+        // AdViewをコンテナに追加
+        adContainer.removeAllViews()
+        adContainer.addView(bannerAdView)
+
+        // 広告を読み込む
+        val adRequest = AdRequest.Builder().build()
+        bannerAdView?.loadAd(adRequest)
     }
 
 }
