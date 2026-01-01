@@ -46,8 +46,8 @@ class FolderContentAdapter(
         val maxLines = prefs.getInt("max_lines", 3)
         holder.contentText.maxLines = maxLines
 
-        val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
-        holder.dateText.text = dateFormat.format(Date(memo.createdAt))
+        // 日時は非表示
+        holder.dateText.visibility = View.GONE
 
         when {
             isReorderMode -> {
