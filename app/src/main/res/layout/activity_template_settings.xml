@@ -38,7 +38,50 @@
         android:orientation="vertical"
         android:background="#FFFFFF">
 
-    <!-- コピー後に自動で閉じる -->
+    <!-- 1. 同じ内容を重複して保存する -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="同じ内容を重複して保存する"
+                android:textSize="16sp"
+                android:textColor="#000000" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="同じテキストを複数回保存できるようにします"
+                android:textSize="14sp"
+                android:textColor="#5F6368"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/duplicateSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E0E0E0"
+        android:layout_marginStart="16dp" />
+
+    <!-- 2. コピー後に自動で閉じる -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -81,7 +124,7 @@
         android:background="#E0E0E0"
         android:layout_marginStart="16dp" />
 
-    <!-- 2. 表示行数 -->
+    <!-- 3. 表示行数 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

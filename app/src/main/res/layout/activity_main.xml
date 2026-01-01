@@ -66,6 +66,29 @@
             android:visibility="gone"
             android:contentDescription="削除" />
 
+        <!-- 並び替えモード：キャンセル -->
+        <TextView
+            android:id="@+id/reorderCancelButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="キャンセル"
+            android:textSize="16sp"
+            android:textColor="#666666"
+            android:padding="8dp"
+            android:visibility="gone" />
+
+        <!-- 並び替えモード：完了 -->
+        <TextView
+            android:id="@+id/reorderDoneButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="完了"
+            android:textSize="16sp"
+            android:textColor="#1A73E8"
+            android:padding="8dp"
+            android:layout_marginStart="16dp"
+            android:visibility="gone" />
+
         <!-- 検索 -->
         <ImageView
             android:id="@+id/searchButton"

@@ -9,5 +9,6 @@ data class MemoEntity(
     val content: String,
     val createdAt: Long = System.currentTimeMillis(),
     val isTemplate: Boolean = false,
-    val folder: String? = null  // ← 追加
+    val folder: String? = null,
+    val displayOrder: Int = 0  // 並び替え用
 )

@@ -24,7 +24,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var headerTitle: TextView
     private lateinit var searchButton: ImageView
     private lateinit var searchView: androidx.appcompat.widget.SearchView
+    private lateinit var reorderCancelButton: TextView
+    private lateinit var reorderDoneButton: TextView
     private var isSearchMode = false
+    private var isReorderMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +44,8 @@ class MainActivity : AppCompatActivity() {
         headerTitle = findViewById(R.id.headerTitle)
         searchButton = findViewById(R.id.searchButton)
         searchView = findViewById(R.id.searchView)
+        reorderCancelButton = findViewById(R.id.reorderCancelButton)
+        reorderDoneButton = findViewById(R.id.reorderDoneButton)
 
         backButton.setOnClickListener {
             if (isSearchMode) {
@@ -94,6 +99,16 @@ class MainActivity : AppCompatActivity() {
             deleteSelectedItems()
         }
 
+        // 並び替えモード：キャンセル
+        reorderCancelButton.setOnClickListener {
+            exitReorderMode(save = false)
+        }
+
+        // 並び替えモード：完了
+        reorderDoneButton.setOnClickListener {
+            exitReorderMode(save = true)
+        }
+
         // Fragment切り替え時の処理
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
@@ -125,9 +140,47 @@ class MainActivity : AppCompatActivity() {
                 deleteButton.visibility = View.GONE
             }
         })
+
+        // displayOrderの初期値設定（マイグレーション対応）
+        initializeDisplayOrder()
+    }
+
+    private fun initializeDisplayOrder() {
+        lifecycleScope.launch {
+            val db = AppDatabase.getDatabase(this@MainActivity)
+            val allMemos = db.memoDao().getAllMemos()
+
+            // displayOrderが全て0のメモがあるかチェック
+            val memosWithoutOrder = allMemos.filter { it.displayOrder == 0 }
+            if (memosWithoutOrder.isNotEmpty()) {
+                // 履歴と定型文を分けて処理
+                val historyMemos = memosWithoutOrder.filter { !it.isTemplate }
+                    .sortedByDescending { it.createdAt }
+                val templateMemos = memosWithoutOrder.filter { it.isTemplate }
+                    .sortedByDescending { it.createdAt }
+
+                // 履歴に順序を設定
+                historyMemos.forEachIndexed { index, memo ->
+                    val updated = memo.copy(displayOrder = index)
+                    db.memoDao().update(updated)
+                }
+
+                // 定型文に順序を設定
+                templateMemos.forEachIndexed { index, memo ->
+                    val updated = memo.copy(displayOrder = index)
+                    db.memoDao().update(updated)
+                }
+            }
+        }
     }
 
     override fun onBackPressed() {
+        // 並び替えモード中ならキャンセル
+        if (isReorderMode) {
+            exitReorderMode(save = false)
+            return
+        }
+
         // 検索モード中なら検索解除
         if (isSearchMode) {
             hideSearchBar()
@@ -194,18 +247,21 @@ class MainActivity : AppCompatActivity() {
         // 定型文タブの場合、選択内容に応じて「移動」を表示
         if (viewPager.currentItem == 1) {
             val selectedItems = templateFragment?.getSelectedItems()
+            val moveItem = popup.menu.findItem(R.id.action_move_selected)
+
             if (selectedItems != null && selectedItems.isNotEmpty()) {
+                moveItem?.isVisible = true
                 if (isInFolder) {
-                    // フォルダ内：全てテンプレートなので常に表示
-                    popup.menu.findItem(R.id.action_move_selected)?.isVisible = true
+                    // フォルダ内：全てテンプレートなので常に有効
+                    moveItem?.isEnabled = true
                 } else {
-                    // フォルダ一覧：フォルダが含まれていなければ表示
+                    // フォルダ一覧：フォルダが含まれている場合は無効化（グレーアウト）
                     val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } ?: false
-                    popup.menu.findItem(R.id.action_move_selected)?.isVisible = !hasFolder
+                    moveItem?.isEnabled = !hasFolder
                 }
             } else {
                 // 未選択時は非表示
-                popup.menu.findItem(R.id.action_move_selected)?.isVisible = false
+                moveItem?.isVisible = false
             }
         }
 
@@ -242,7 +298,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 R.id.action_sort -> {
-                    showSortDialog()
+                    enterReorderMode()
                     true
                 }
                 R.id.action_settings -> {
@@ -260,37 +316,6 @@ class MainActivity : AppCompatActivity() {
         popup.show()
     }
 
-    private fun showSortDialog() {
-        val prefsName = when (viewPager.currentItem) {
-            0 -> "app_settings"
-            1 -> "template_settings"
-            else -> "app_settings"
-        }
-
-        val prefs = getSharedPreferences(prefsName, MODE_PRIVATE)
-        val currentSort = prefs.getString("sort_order", "newest") ?: "newest"
-
-        val sortOptions = arrayOf("新しい順", "古い順", "名前順")
-        val sortValues = arrayOf("newest", "oldest", "name")
-        val checkedItem = sortValues.indexOf(currentSort)
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("並び替え")
-            .setSingleChoiceItems(sortOptions, checkedItem) { dialog, which ->
-                val selectedSort = sortValues[which]
-                prefs.edit().putString("sort_order", selectedSort).apply()
-
-                // リストを更新
-                when (viewPager.currentItem) {
-                    0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.loadMemos()
-                    1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.loadMemos()
-                }
-
-                dialog.dismiss()
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-    }
 
     private fun showAddTemplateDialog() {
         val editText = android.widget.EditText(this).apply {
@@ -377,10 +402,37 @@ class MainActivity : AppCompatActivity() {
     private fun addTemplateWithFolder(text: String, folder: String?) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
+            val prefs = getSharedPreferences("template_settings", MODE_PRIVATE)
+            val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
+
+            // 重複チェック（定型文のみ）
+            if (!allowDuplicate) {
+                val allTemplates = db.memoDao().getAllMemos().filter { it.isTemplate }
+                val existing = allTemplates.find { it.content == text && it.folder == folder }
+                if (existing != null) {
+                    android.widget.Toast.makeText(
+                        this@MainActivity,
+                        "既に同じ定型文が存在します",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+            }
+
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
+            val templatesInFolder = db.memoDao().getAllMemos()
+                .filter { it.isTemplate && it.folder == folder }
+            templatesInFolder.forEach { memo ->
+                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
+                db.memoDao().update(updated)
+            }
+
+            // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
                 content = text,
                 isTemplate = true,
-                folder = folder
+                folder = folder,
+                displayOrder = 0
             )
             db.memoDao().insert(newTemplate)
 
@@ -456,11 +508,38 @@ class MainActivity : AppCompatActivity() {
     private fun addHistoryItemAsTemplate(historyMemo: MemoEntity, folder: String?) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
+            val prefs = getSharedPreferences("template_settings", MODE_PRIVATE)
+            val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
+
+            // 重複チェック（定型文のみ）
+            if (!allowDuplicate) {
+                val allTemplates = db.memoDao().getAllMemos().filter { it.isTemplate }
+                val existing = allTemplates.find { it.content == historyMemo.content && it.folder == folder }
+                if (existing != null) {
+                    android.widget.Toast.makeText(
+                        this@MainActivity,
+                        "既に同じ定型文が存在します",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+            }
+
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
+            val templatesInFolder = db.memoDao().getAllMemos()
+                .filter { it.isTemplate && it.folder == folder }
+            templatesInFolder.forEach { memo ->
+                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
+                db.memoDao().update(updated)
+            }
+
+            // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
                 content = historyMemo.content,
                 isTemplate = true,
                 folder = folder,
                 createdAt = System.currentTimeMillis(),
+                displayOrder = 0,
                 id = 0
             )
             db.memoDao().insert(newTemplate)
@@ -638,16 +717,44 @@ class MainActivity : AppCompatActivity() {
     private fun addMultipleHistoryItemsAsTemplate(historyMemos: List<MemoEntity>, folder: String?) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
+            val prefs = getSharedPreferences("template_settings", MODE_PRIVATE)
+            val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
 
-            historyMemos.forEach { historyMemo ->
+            val allTemplates = db.memoDao().getAllMemos().filter { it.isTemplate }
+            var addedCount = 0
+            var skippedCount = 0
+
+            // 既存の定型文のdisplayOrderを取得（最大値）
+            val templatesInFolder = db.memoDao().getAllMemos()
+                .filter { it.isTemplate && it.folder == folder }
+
+            // 全ての既存定型文のdisplayOrderを履歴件数分増やす
+            templatesInFolder.forEach { memo ->
+                val updated = memo.copy(displayOrder = memo.displayOrder + historyMemos.size)
+                db.memoDao().update(updated)
+            }
+
+            historyMemos.forEachIndexed { index, historyMemo ->
+                // 重複チェック
+                if (!allowDuplicate) {
+                    val existing = allTemplates.find { it.content == historyMemo.content && it.folder == folder }
+                    if (existing != null) {
+                        skippedCount++
+                        return@forEachIndexed
+                    }
+                }
+
+                // 新規定型文を追加（displayOrderは逆順で設定）
                 val newTemplate = MemoEntity(
                     content = historyMemo.content,
                     isTemplate = true,
                     folder = folder,
                     createdAt = System.currentTimeMillis(),
+                    displayOrder = historyMemos.size - 1 - index,
                     id = 0
                 )
                 db.memoDao().insert(newTemplate)
+                addedCount++
             }
 
             // 定型文タブを更新
@@ -659,9 +766,15 @@ class MainActivity : AppCompatActivity() {
             clipboardFragment?.exitSelectMode()
             deleteButton.visibility = View.GONE
 
+            val message = if (skippedCount > 0) {
+                "${addedCount}件を定型文に追加しました（${skippedCount}件は重複のためスキップ）"
+            } else {
+                "${addedCount}件を定型文に追加しました"
+            }
+
             android.widget.Toast.makeText(
                 this@MainActivity,
-                "${historyMemos.size}件を定型文に追加しました",
+                message,
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
@@ -904,6 +1017,47 @@ class MainActivity : AppCompatActivity() {
             0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.filterMemos(query)
             1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.filterMemos(query)
         }
+    }
+
+    private fun enterReorderMode() {
+        isReorderMode = true
+
+        // ViewPagerのスワイプを無効化（タブ切り替え禁止）
+        viewPager.isUserInputEnabled = false
+
+        // ヘッダーUIを並び替えモード用に変更
+        searchButton.visibility = View.GONE
+        headerMenuButton.visibility = View.GONE
+        deleteButton.visibility = View.GONE
+        reorderCancelButton.visibility = View.VISIBLE
+        reorderDoneButton.visibility = View.VISIBLE
+
+        // Fragmentに並び替えモード開始を通知
+        when (viewPager.currentItem) {
+            0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.enterReorderMode()
+            1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.enterReorderMode()
+        }
+    }
+
+    private fun exitReorderMode(save: Boolean) {
+        if (!isReorderMode) return
+
+        // Fragmentに並び替えモード終了を通知
+        when (viewPager.currentItem) {
+            0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.exitReorderMode(save)
+            1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.exitReorderMode(save)
+        }
+
+        isReorderMode = false
+
+        // ViewPagerのスワイプを有効化
+        viewPager.isUserInputEnabled = true
+
+        // ヘッダーUIを通常モードに戻す
+        reorderCancelButton.visibility = View.GONE
+        reorderDoneButton.visibility = View.GONE
+        searchButton.visibility = View.VISIBLE
+        headerMenuButton.visibility = View.VISIBLE
     }
 
 }

@@ -11,6 +11,7 @@ import androidx.appcompat.widget.Toolbar
 
 class TemplateSettingsActivity : AppCompatActivity() {
 
+    private lateinit var duplicateSwitch: SwitchCompat
     private lateinit var autoCloseSwitch: SwitchCompat
     private lateinit var maxLinesSpinner: Spinner
 
@@ -28,11 +29,13 @@ class TemplateSettingsActivity : AppCompatActivity() {
         supportActionBar?.setDisplayShowTitleEnabled(false)
 
         // スイッチの初期化
+        duplicateSwitch = findViewById(R.id.duplicateSwitch)
         autoCloseSwitch = findViewById(R.id.autoCloseSwitch)
         maxLinesSpinner = findViewById(R.id.maxLinesSpinner)
 
         // SharedPreferencesから設定読み込み
         val prefs = getSharedPreferences("template_settings", Context.MODE_PRIVATE)
+        duplicateSwitch.isChecked = prefs.getBoolean("allow_duplicate", false)
         autoCloseSwitch.isChecked = prefs.getBoolean("auto_close", true)
 
         // 表示行数の初期値（デフォルトは3行=インデックス2）
@@ -40,6 +43,10 @@ class TemplateSettingsActivity : AppCompatActivity() {
         maxLinesSpinner.setSelection(maxLines - 1)
 
         // スイッチの変更を保存
+        duplicateSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("allow_duplicate", isChecked).apply()
+        }
+
         autoCloseSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("auto_close", isChecked).apply()
         }

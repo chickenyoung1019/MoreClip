@@ -27,6 +27,7 @@ class TemplateAdapter(
     }
 
     private var isSelectMode = false
+    private var isReorderMode = false
     private val selectedItems = mutableSetOf<String>()  // "folder:名前" or "template:id"
 
     override fun getItemViewType(position: Int): Int {
@@ -75,32 +76,43 @@ class TemplateAdapter(
 
             val itemKey = "folder:${folder.name}"
 
-            if (isSelectMode) {
-                // 選択モード：三点→チェックボックス
-                val isSelected = selectedItems.contains(itemKey)
-                folderMenuButton.setImageResource(
-                    if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
-                )
-                folderMenuButton.setOnClickListener {
-                    toggleSelection(itemKey)
+            when {
+                isReorderMode -> {
+                    // 並び替えモード：メニューボタン非表示
+                    folderMenuButton.visibility = View.GONE
+                    itemView.setOnClickListener(null)
+                    itemView.setOnLongClickListener(null)
                 }
-                itemView.setOnClickListener {
-                    toggleSelection(itemKey)
+                isSelectMode -> {
+                    // 選択モード：三点→チェックボックス
+                    folderMenuButton.visibility = View.VISIBLE
+                    val isSelected = selectedItems.contains(itemKey)
+                    folderMenuButton.setImageResource(
+                        if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
+                    )
+                    folderMenuButton.setOnClickListener {
+                        toggleSelection(itemKey)
+                    }
+                    itemView.setOnClickListener {
+                        toggleSelection(itemKey)
+                    }
+                    itemView.setOnLongClickListener(null)
                 }
-                itemView.setOnLongClickListener(null)
-            } else {
-                // 通常モード：三点メニュー
-                folderMenuButton.setImageResource(R.drawable.ic_more_vert)
-                folderMenuButton.setOnClickListener { view ->
-                    showFolderPopupMenu(view, folder.name)
-                }
-                itemView.setOnClickListener {
-                    onFolderClick(folder.name)
-                }
-                itemView.setOnLongClickListener {
-                    onSelectMode()
-                    toggleSelection(itemKey)
-                    true
+                else -> {
+                    // 通常モード：三点メニュー
+                    folderMenuButton.visibility = View.VISIBLE
+                    folderMenuButton.setImageResource(R.drawable.ic_more_vert)
+                    folderMenuButton.setOnClickListener { view ->
+                        showFolderPopupMenu(view, folder.name)
+                    }
+                    itemView.setOnClickListener {
+                        onFolderClick(folder.name)
+                    }
+                    itemView.setOnLongClickListener {
+                        onSelectMode()
+                        toggleSelection(itemKey)
+                        true
+                    }
                 }
             }
         }
@@ -147,30 +159,43 @@ class TemplateAdapter(
 
             val itemKey = "template:${template.memo.id}"
 
-            if (isSelectMode) {
-                val isSelected = selectedItems.contains(itemKey)
-                menuButton.setImageResource(
-                    if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
-                )
-                menuButton.setOnClickListener {
-                    toggleSelection(itemKey)
+            when {
+                isReorderMode -> {
+                    // 並び替えモード：メニューボタン非表示
+                    menuButton.visibility = View.GONE
+                    itemView.setOnClickListener(null)
+                    itemView.setOnLongClickListener(null)
                 }
-                itemView.setOnClickListener {
-                    toggleSelection(itemKey)
+                isSelectMode -> {
+                    // 選択モード：チェックボックス表示
+                    menuButton.visibility = View.VISIBLE
+                    val isSelected = selectedItems.contains(itemKey)
+                    menuButton.setImageResource(
+                        if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
+                    )
+                    menuButton.setOnClickListener {
+                        toggleSelection(itemKey)
+                    }
+                    itemView.setOnClickListener {
+                        toggleSelection(itemKey)
+                    }
+                    itemView.setOnLongClickListener(null)
                 }
-                itemView.setOnLongClickListener(null)
-            } else {
-                menuButton.setImageResource(R.drawable.ic_more_vert)
-                menuButton.setOnClickListener { view ->
-                    showPopupMenu(view, template.memo)
-                }
-                itemView.setOnClickListener {
-                    onTemplateClick(template.memo)
-                }
-                itemView.setOnLongClickListener {
-                    onSelectMode()
-                    toggleSelection(itemKey)
-                    true
+                else -> {
+                    // 通常モード：三点メニュー
+                    menuButton.visibility = View.VISIBLE
+                    menuButton.setImageResource(R.drawable.ic_more_vert)
+                    menuButton.setOnClickListener { view ->
+                        showPopupMenu(view, template.memo)
+                    }
+                    itemView.setOnClickListener {
+                        onTemplateClick(template.memo)
+                    }
+                    itemView.setOnLongClickListener {
+                        onSelectMode()
+                        toggleSelection(itemKey)
+                        true
+                    }
                 }
             }
         }
@@ -259,4 +284,25 @@ class TemplateAdapter(
         items = newItems
         notifyDataSetChanged()
     }
+
+    // 並び替えモード
+    fun enterReorderMode() {
+        isReorderMode = true
+        notifyDataSetChanged()
+    }
+
+    fun exitReorderMode() {
+        isReorderMode = false
+        notifyDataSetChanged()
+    }
+
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        val mutableList = items.toMutableList()
+        val item = mutableList.removeAt(fromPosition)
+        mutableList.add(toPosition, item)
+        items = mutableList
+        notifyItemMoved(fromPosition, toPosition)
+    }
+
+    fun getCurrentList(): List<TemplateItem> = items
 }

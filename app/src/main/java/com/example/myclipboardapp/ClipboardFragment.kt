@@ -64,17 +64,10 @@ class ClipboardFragment : Fragment() {
     fun loadMemos() {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            val prefs = requireContext().getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-            val sortOrder = prefs.getString("sort_order", "newest") ?: "newest"
-
             val memos = db.memoDao().getHistoryMemos()
 
-            // 並び替え適用
-            allMemos = when (sortOrder) {
-                "oldest" -> memos.sortedBy { it.createdAt }
-                "name" -> memos.sortedBy { it.content }
-                else -> memos.sortedByDescending { it.createdAt } // "newest"
-            }
+            // displayOrder順に並び替え
+            allMemos = memos.sortedBy { it.displayOrder }
 
             // 検索フィルターを適用
             filterMemos(currentSearchQuery)
@@ -115,7 +108,22 @@ class ClipboardFragment : Fragment() {
 
             copiedMemo?.let {
                 if (prefs.getBoolean("move_to_top", true)) {
-                    val updated = it.copy(createdAt = System.currentTimeMillis())
+                    // 履歴メモのみ取得
+                    val historyMemos = db.memoDao().getHistoryMemos()
+
+                    // 他の履歴のdisplayOrderを1増やす
+                    historyMemos.forEach { memo ->
+                        if (memo.id != it.id) {
+                            val updated = memo.copy(displayOrder = memo.displayOrder + 1)
+                            db.memoDao().update(updated)
+                        }
+                    }
+
+                    // コピーしたメモを最新（displayOrder=0）に設定
+                    val updated = it.copy(
+                        createdAt = System.currentTimeMillis(),
+                        displayOrder = 0
+                    )
                     db.memoDao().update(updated)
                     loadMemos()
                 }
@@ -194,5 +202,74 @@ class ClipboardFragment : Fragment() {
             }
             .setNegativeButton("キャンセル", null)
             .show()
+    }
+
+    // 並び替えモード
+    private var itemTouchHelper: androidx.recyclerview.widget.ItemTouchHelper? = null
+    private var reorderBackupList: List<MemoEntity>? = null
+
+    fun enterReorderMode() {
+        // バックアップを保存
+        reorderBackupList = allMemos.toList()
+
+        // AdapterとItemTouchHelperを設定
+        adapter.enterReorderMode()
+        if (itemTouchHelper == null) {
+            val callback = object : androidx.recyclerview.widget.ItemTouchHelper.Callback() {
+                override fun getMovementFlags(
+                    recyclerView: RecyclerView,
+                    viewHolder: RecyclerView.ViewHolder
+                ): Int {
+                    val dragFlags = androidx.recyclerview.widget.ItemTouchHelper.UP or
+                            androidx.recyclerview.widget.ItemTouchHelper.DOWN
+                    return makeMovementFlags(dragFlags, 0)
+                }
+
+                override fun onMove(
+                    recyclerView: RecyclerView,
+                    viewHolder: RecyclerView.ViewHolder,
+                    target: RecyclerView.ViewHolder
+                ): Boolean {
+                    val fromPosition = viewHolder.adapterPosition
+                    val toPosition = target.adapterPosition
+                    adapter.moveItem(fromPosition, toPosition)
+                    return true
+                }
+
+                override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                    // スワイプ無効
+                }
+
+                override fun isLongPressDragEnabled() = true
+            }
+            itemTouchHelper = androidx.recyclerview.widget.ItemTouchHelper(callback)
+        }
+        itemTouchHelper?.attachToRecyclerView(recyclerView)
+    }
+
+    fun exitReorderMode(save: Boolean) {
+        if (save) {
+            // 並び替え結果を保存
+            lifecycleScope.launch {
+                val db = AppDatabase.getDatabase(requireContext())
+                val currentList = adapter.getCurrentList()
+                currentList.forEachIndexed { index, memo ->
+                    val updated = memo.copy(displayOrder = index)
+                    db.memoDao().update(updated)
+                }
+                loadMemos()
+                Toast.makeText(requireContext(), "並び替えを保存しました", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            // 変更を破棄
+            reorderBackupList?.let {
+                adapter.updateData(it)
+            }
+        }
+
+        // ItemTouchHelperを解除
+        itemTouchHelper?.attachToRecyclerView(null)
+        adapter.exitReorderMode()
+        reorderBackupList = null
     }
 }

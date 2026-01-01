@@ -40,12 +40,26 @@ class ProcessTextActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
                 val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
 
-                // 重複チェック
+                // 重複チェック（履歴のみ）
                 if (!allowDuplicate) {
-                    val existing = db.memoDao().getAllMemos().find { it.content == text }
+                    val existing = db.memoDao().getHistoryMemos().find { it.content == text }
                     if (existing != null) {
-                        // 重複している場合は日時だけ更新
-                        val updated = existing.copy(createdAt = System.currentTimeMillis())
+                        // 重複している場合は日時とdisplayOrderを更新（最新に移動）
+                        val historyMemos = db.memoDao().getHistoryMemos()
+
+                        // 他の履歴のdisplayOrderを1増やす
+                        historyMemos.forEach { memo ->
+                            if (memo.id != existing.id) {
+                                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
+                                db.memoDao().update(updated)
+                            }
+                        }
+
+                        // 既存メモを最新に移動
+                        val updated = existing.copy(
+                            createdAt = System.currentTimeMillis(),
+                            displayOrder = 0
+                        )
                         db.memoDao().update(updated)
                         Toast.makeText(
                             applicationContext,
@@ -58,7 +72,15 @@ class ProcessTextActivity : AppCompatActivity() {
                 }
 
                 // 新規保存
-                db.memoDao().insert(MemoEntity(content = text))
+                // 既存の履歴のdisplayOrderを1増やす
+                val historyMemos = db.memoDao().getHistoryMemos()
+                historyMemos.forEach { memo ->
+                    val updated = memo.copy(displayOrder = memo.displayOrder + 1)
+                    db.memoDao().update(updated)
+                }
+
+                // 新規メモをdisplayOrder=0で保存（一番上）
+                db.memoDao().insert(MemoEntity(content = text, displayOrder = 0))
                 Toast.makeText(
                     applicationContext,
                     "保存しました: ${text.take(10)}...",

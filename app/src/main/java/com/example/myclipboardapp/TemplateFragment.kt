@@ -71,8 +71,6 @@ class TemplateFragment : Fragment() {
     fun loadMemos() {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            val prefs = requireContext().getSharedPreferences("template_settings", Context.MODE_PRIVATE)
-            val sortOrder = prefs.getString("sort_order", "newest") ?: "newest"
 
             if (currentFolder == null) {
                 // フォルダ一覧表示
@@ -86,12 +84,8 @@ class TemplateFragment : Fragment() {
 
                 val templatesWithoutFolder = db.memoDao().getTemplatesWithoutFolder()
 
-                // 定型文を並び替え
-                val sortedTemplates = when (sortOrder) {
-                    "oldest" -> templatesWithoutFolder.sortedBy { it.createdAt }
-                    "name" -> templatesWithoutFolder.sortedBy { it.content }
-                    else -> templatesWithoutFolder.sortedByDescending { it.createdAt } // "newest"
-                }
+                // displayOrder順に並び替え
+                val sortedTemplates = templatesWithoutFolder.sortedBy { it.displayOrder }
 
                 sortedTemplates.forEach { memo ->
                     templateItems.add(TemplateItem.Template(memo))
@@ -105,12 +99,8 @@ class TemplateFragment : Fragment() {
                 // フォルダ内容表示
                 val memos = db.memoDao().getTemplatesByFolder(currentFolder!!)
 
-                // 並び替え適用
-                allFolderMemos = when (sortOrder) {
-                    "oldest" -> memos.sortedBy { it.createdAt }
-                    "name" -> memos.sortedBy { it.content }
-                    else -> memos.sortedByDescending { it.createdAt } // "newest"
-                }
+                // displayOrder順に並び替え
+                allFolderMemos = memos.sortedBy { it.displayOrder }
 
                 // 検索フィルターを適用
                 filterMemos(currentSearchQuery)
@@ -444,6 +434,111 @@ class TemplateFragment : Fragment() {
                 .setNegativeButton("キャンセル", null)
                 .show()
         }
+    }
+
+    // 並び替えモード
+    private var itemTouchHelper: androidx.recyclerview.widget.ItemTouchHelper? = null
+    private var reorderBackupListItems: List<TemplateItem>? = null
+    private var reorderBackupListMemos: List<MemoEntity>? = null
+
+    fun enterReorderMode() {
+        if (currentFolder == null) {
+            // フォルダ一覧モードのバックアップ
+            reorderBackupListItems = allTemplateItems.toList()
+            adapter.enterReorderMode()
+        } else {
+            // フォルダ内モードのバックアップ
+            reorderBackupListMemos = allFolderMemos.toList()
+            folderContentAdapter?.enterReorderMode()
+        }
+
+        // ItemTouchHelperの設定
+        if (itemTouchHelper == null) {
+            val callback = object : androidx.recyclerview.widget.ItemTouchHelper.Callback() {
+                override fun getMovementFlags(
+                    recyclerView: androidx.recyclerview.widget.RecyclerView,
+                    viewHolder: androidx.recyclerview.widget.RecyclerView.ViewHolder
+                ): Int {
+                    val dragFlags = androidx.recyclerview.widget.ItemTouchHelper.UP or
+                            androidx.recyclerview.widget.ItemTouchHelper.DOWN
+                    return makeMovementFlags(dragFlags, 0)
+                }
+
+                override fun onMove(
+                    recyclerView: androidx.recyclerview.widget.RecyclerView,
+                    viewHolder: androidx.recyclerview.widget.RecyclerView.ViewHolder,
+                    target: androidx.recyclerview.widget.RecyclerView.ViewHolder
+                ): Boolean {
+                    val fromPosition = viewHolder.adapterPosition
+                    val toPosition = target.adapterPosition
+                    if (currentFolder == null) {
+                        adapter.moveItem(fromPosition, toPosition)
+                    } else {
+                        folderContentAdapter?.moveItem(fromPosition, toPosition)
+                    }
+                    return true
+                }
+
+                override fun onSwiped(viewHolder: androidx.recyclerview.widget.RecyclerView.ViewHolder, direction: Int) {
+                    // スワイプ無効
+                }
+
+                override fun isLongPressDragEnabled() = true
+            }
+            itemTouchHelper = androidx.recyclerview.widget.ItemTouchHelper(callback)
+        }
+        itemTouchHelper?.attachToRecyclerView(recyclerView)
+    }
+
+    fun exitReorderMode(save: Boolean) {
+        if (save) {
+            // 並び替え結果を保存
+            lifecycleScope.launch {
+                val db = AppDatabase.getDatabase(requireContext())
+                if (currentFolder == null) {
+                    // フォルダ一覧モード：定型文のみ保存（フォルダは順序なし）
+                    val currentList = adapter.getCurrentList()
+                    var order = 0
+                    currentList.forEach { item ->
+                        if (item is TemplateItem.Template) {
+                            val updated = item.memo.copy(displayOrder = order)
+                            db.memoDao().update(updated)
+                            order++
+                        }
+                    }
+                } else {
+                    // フォルダ内モード
+                    val currentList = folderContentAdapter?.getCurrentList() ?: emptyList()
+                    currentList.forEachIndexed { index, memo ->
+                        val updated = memo.copy(displayOrder = index)
+                        db.memoDao().update(updated)
+                    }
+                }
+                loadMemos()
+                android.widget.Toast.makeText(requireContext(), "並び替えを保存しました", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            // 変更を破棄
+            if (currentFolder == null) {
+                reorderBackupListItems?.let {
+                    adapter.updateData(it)
+                }
+            } else {
+                reorderBackupListMemos?.let {
+                    folderContentAdapter?.updateData(it)
+                }
+            }
+        }
+
+        // ItemTouchHelperを解除
+        itemTouchHelper?.attachToRecyclerView(null)
+        if (currentFolder == null) {
+            adapter.exitReorderMode()
+        } else {
+            folderContentAdapter?.exitReorderMode()
+        }
+        reorderBackupListItems = null
+        reorderBackupListMemos = null
     }
 
 }

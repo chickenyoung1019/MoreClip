@@ -22,6 +22,7 @@ class FolderContentAdapter(
 ) : RecyclerView.Adapter<FolderContentAdapter.ViewHolder>() {
 
     private var isSelectMode = false
+    private var isReorderMode = false
     private val selectedItems = mutableSetOf<Int>()
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -48,30 +49,43 @@ class FolderContentAdapter(
         val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
         holder.dateText.text = dateFormat.format(Date(memo.createdAt))
 
-        if (isSelectMode) {
-            val isSelected = selectedItems.contains(memo.id)
-            holder.menuButton.setImageResource(
-                if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
-            )
-            holder.menuButton.setOnClickListener {
-                toggleSelection(memo.id)
+        when {
+            isReorderMode -> {
+                // 並び替えモード：メニューボタン非表示
+                holder.menuButton.visibility = View.GONE
+                holder.itemView.setOnClickListener(null)
+                holder.itemView.setOnLongClickListener(null)
             }
-            holder.itemView.setOnClickListener {
-                toggleSelection(memo.id)
+            isSelectMode -> {
+                // 選択モード：チェックボックス表示
+                holder.menuButton.visibility = View.VISIBLE
+                val isSelected = selectedItems.contains(memo.id)
+                holder.menuButton.setImageResource(
+                    if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
+                )
+                holder.menuButton.setOnClickListener {
+                    toggleSelection(memo.id)
+                }
+                holder.itemView.setOnClickListener {
+                    toggleSelection(memo.id)
+                }
+                holder.itemView.setOnLongClickListener(null)
             }
-            holder.itemView.setOnLongClickListener(null)
-        } else {
-            holder.menuButton.setImageResource(R.drawable.ic_more_vert)
-            holder.menuButton.setOnClickListener { view ->
-                showPopupMenu(view, memo)
-            }
-            holder.itemView.setOnClickListener {
-                onItemClick(memo)
-            }
-            holder.itemView.setOnLongClickListener {
-                onSelectMode()
-                toggleSelection(memo.id)
-                true
+            else -> {
+                // 通常モード：三点メニュー
+                holder.menuButton.visibility = View.VISIBLE
+                holder.menuButton.setImageResource(R.drawable.ic_more_vert)
+                holder.menuButton.setOnClickListener { view ->
+                    showPopupMenu(view, memo)
+                }
+                holder.itemView.setOnClickListener {
+                    onItemClick(memo)
+                }
+                holder.itemView.setOnLongClickListener {
+                    onSelectMode()
+                    toggleSelection(memo.id)
+                    true
+                }
             }
         }
     }
@@ -156,4 +170,25 @@ class FolderContentAdapter(
         memos = newMemos
         notifyDataSetChanged()
     }
+
+    // 並び替えモード
+    fun enterReorderMode() {
+        isReorderMode = true
+        notifyDataSetChanged()
+    }
+
+    fun exitReorderMode() {
+        isReorderMode = false
+        notifyDataSetChanged()
+    }
+
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        val mutableList = memos.toMutableList()
+        val item = mutableList.removeAt(fromPosition)
+        mutableList.add(toPosition, item)
+        memos = mutableList
+        notifyItemMoved(fromPosition, toPosition)
+    }
+
+    fun getCurrentList(): List<MemoEntity> = memos
 }

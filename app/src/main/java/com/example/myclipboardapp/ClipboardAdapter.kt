@@ -22,6 +22,7 @@ class ClipboardAdapter(
 ) : RecyclerView.Adapter<ClipboardAdapter.MemoViewHolder>() {
 
     private var isSelectMode = false
+    private var isReorderMode = false
     private val selectedItems = mutableSetOf<Int>()
 
     class MemoViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -48,35 +49,46 @@ class ClipboardAdapter(
         val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
         holder.dateText.text = dateFormat.format(Date(memo.createdAt))
 
-        // 選択モードの表示切り替え
-        if (isSelectMode) {
-            // 選択モード：○または●✓を表示
-            val isSelected = selectedItems.contains(memo.id)
-            holder.menuButton.setImageResource(
-                if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
-            )
-            holder.menuButton.setOnClickListener {
-                toggleSelection(memo.id)
+        // モードの表示切り替え
+        when {
+            isReorderMode -> {
+                // 並び替えモード：メニューボタン非表示
+                holder.menuButton.visibility = View.GONE
+                holder.itemView.setOnClickListener(null)
+                holder.itemView.setOnLongClickListener(null)
             }
-            holder.itemView.setOnClickListener {
-                toggleSelection(memo.id)
+            isSelectMode -> {
+                // 選択モード：○または●✓を表示
+                holder.menuButton.visibility = View.VISIBLE
+                val isSelected = selectedItems.contains(memo.id)
+                holder.menuButton.setImageResource(
+                    if (isSelected) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked
+                )
+                holder.menuButton.setOnClickListener {
+                    toggleSelection(memo.id)
+                }
+                holder.itemView.setOnClickListener {
+                    toggleSelection(memo.id)
+                }
+                // 長押しは無効化
+                holder.itemView.setOnLongClickListener(null)
             }
-            // 長押しは無効化
-            holder.itemView.setOnLongClickListener(null)
-        } else {
-            // 通常モード：︙を表示
-            holder.menuButton.setImageResource(R.drawable.ic_more_vert)
-            holder.menuButton.setOnClickListener { view ->
-                showPopupMenu(view, memo)
-            }
-            holder.itemView.setOnClickListener {
-                onItemClick(memo)
-            }
-            // 長押しで選択モード開始
-            holder.itemView.setOnLongClickListener {
-                onSelectMode()
-                toggleSelection(memo.id)
-                true
+            else -> {
+                // 通常モード：︙を表示
+                holder.menuButton.visibility = View.VISIBLE
+                holder.menuButton.setImageResource(R.drawable.ic_more_vert)
+                holder.menuButton.setOnClickListener { view ->
+                    showPopupMenu(view, memo)
+                }
+                holder.itemView.setOnClickListener {
+                    onItemClick(memo)
+                }
+                // 長押しで選択モード開始
+                holder.itemView.setOnLongClickListener {
+                    onSelectMode()
+                    toggleSelection(memo.id)
+                    true
+                }
             }
         }
     }
@@ -162,4 +174,25 @@ class ClipboardAdapter(
         memos = newMemos
         notifyDataSetChanged()
     }
+
+    // 並び替えモード
+    fun enterReorderMode() {
+        isReorderMode = true
+        notifyDataSetChanged()
+    }
+
+    fun exitReorderMode() {
+        isReorderMode = false
+        notifyDataSetChanged()
+    }
+
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        val mutableList = memos.toMutableList()
+        val item = mutableList.removeAt(fromPosition)
+        mutableList.add(toPosition, item)
+        memos = mutableList
+        notifyItemMoved(fromPosition, toPosition)
+    }
+
+    fun getCurrentList(): List<MemoEntity> = memos
 }
