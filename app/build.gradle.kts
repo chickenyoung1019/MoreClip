@@ -56,6 +56,9 @@ dependencies {
     // Coroutines (lifecycleScope用)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // Google AdMob
+    implementation("com.google.android.gms:play-services-ads:23.0.0")
+
     // Test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
