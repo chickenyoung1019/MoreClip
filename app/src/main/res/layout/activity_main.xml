@@ -7,11 +7,11 @@
     android:background="#E6F0F9"
     android:fitsSystemWindows="true">
 
-    <!-- バナー広告スペース（将来実装用） -->
+    <!-- バナー広告スペース -->
     <FrameLayout
         android:id="@+id/adBannerContainer"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="wrap_content"
         android:background="#FFFFFF"
         android:visibility="visible" />
 

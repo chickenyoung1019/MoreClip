@@ -1172,7 +1172,7 @@ class MainActivity : AppCompatActivity() {
         // AdViewを作成
         bannerAdView = AdView(this).apply {
             adUnitId = "ca-app-pub-5377681981369299/6584173262" // 本番バナー広告ID
-            setAdSize(AdSize.BANNER)
+            setAdSize(getAdaptiveBannerAdSize())
         }
 
         // AdViewをコンテナに追加
@@ -1182,6 +1182,16 @@ class MainActivity : AppCompatActivity() {
         // 広告を読み込む
         val adRequest = AdRequest.Builder().build()
         bannerAdView?.loadAd(adRequest)
+    }
+
+    // アダプティブバナーのサイズを取得
+    private fun getAdaptiveBannerAdSize(): AdSize {
+        val displayMetrics = resources.displayMetrics
+        val adWidthPixels = displayMetrics.widthPixels.toFloat()
+        val density = displayMetrics.density
+        val adWidth = (adWidthPixels / density).toInt()
+
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
     }
 
 }
