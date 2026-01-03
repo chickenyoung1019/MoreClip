@@ -1,4 +1,4 @@
-package com.example.myclipboardapp
+package com.chickenyoung.moreclip
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

@@ -1,4 +1,4 @@
-package com.example.myclipboardapp
+package com.chickenyoung.moreclip
 
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity

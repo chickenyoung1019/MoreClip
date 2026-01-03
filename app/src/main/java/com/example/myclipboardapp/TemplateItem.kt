@@ -1,4 +1,4 @@
-package com.example.myclipboardapp
+package com.chickenyoung.moreclip
 
 sealed class TemplateItem {
     data class Folder(

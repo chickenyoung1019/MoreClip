@@ -14,11 +14,11 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.myclipboardapp"
+    namespace = "com.chickenyoung.moreclip"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myclipboardapp"
+        applicationId = "com.chickenyoung.moreclip"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -29,7 +29,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(keystoreProperties.getProperty("KEYSTORE_FILE") ?: "moreclip-release.jks")
+            storeFile = rootProject.file(keystoreProperties.getProperty("KEYSTORE_FILE") ?: "moreclip-release.jks")
             storePassword = keystoreProperties.getProperty("KEYSTORE_PASSWORD")
             keyAlias = keystoreProperties.getProperty("KEY_ALIAS")
             keyPassword = keystoreProperties.getProperty("KEY_PASSWORD")

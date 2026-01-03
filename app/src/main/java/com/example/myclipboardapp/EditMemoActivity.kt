@@ -1,4 +1,4 @@
-package com.example.myclipboardapp
+package com.chickenyoung.moreclip
 
 import android.os.Bundle
 import android.widget.EditText

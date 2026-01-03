@@ -1,4 +1,4 @@
-package com.example.myclipboardapp
+package com.chickenyoung.moreclip
 
 import androidx.room.Dao
 import androidx.room.Delete
