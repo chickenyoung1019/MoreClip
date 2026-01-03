@@ -16,13 +16,9 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.AdSize
-import android.content.Context
-import java.util.Calendar
 import android.widget.FrameLayout
 
 class MainActivity : AppCompatActivity() {
@@ -166,8 +162,8 @@ class MainActivity : AppCompatActivity() {
         // バナー広告読み込み
         loadBannerAd()
 
-        // インタースティシャル広告表示チェック
-        checkAndShowAd()
+        // インタースティシャル広告読み込み（頻度制限はAdMob側で管理）
+        loadInterstitialAd()
     }
 
     private fun initializeDisplayOrder() {
@@ -1085,84 +1081,21 @@ class MainActivity : AppCompatActivity() {
         headerMenuButton.visibility = View.VISIBLE
     }
 
-    // 広告表示チェック
-    private fun checkAndShowAd() {
-        val prefs = getSharedPreferences("ad_settings", Context.MODE_PRIVATE)
-        val lastAdTime = prefs.getLong("last_ad_time", 0)
-        val lastAdDate = prefs.getString("last_ad_date", "")
-        val currentTime = System.currentTimeMillis()
-
-        // 現在の日付を取得（yyyy-MM-dd形式）
-        val calendar = Calendar.getInstance()
-        val currentDate = "${calendar.get(Calendar.YEAR)}-${calendar.get(Calendar.MONTH) + 1}-${calendar.get(Calendar.DAY_OF_MONTH)}"
-
-        // 日付が変わっているかチェック（0時リセット）
-        val isDifferentDay = lastAdDate != currentDate
-
-        // 6時間（21600000ミリ秒）経過しているかチェック
-        val sixHoursInMillis = 6 * 60 * 60 * 1000
-        val hasEnoughTimePassed = (currentTime - lastAdTime) >= sixHoursInMillis
-
-        // 条件を満たせば広告を読み込んで表示
-        if (isDifferentDay || hasEnoughTimePassed) {
-            loadInterstitialAd()
-        }
-    }
-
     // インタースティシャル広告を読み込む
     private fun loadInterstitialAd() {
         val adRequest = AdRequest.Builder().build()
-        // 本番広告ID
         val adUnitId = "ca-app-pub-5377681981369299/4938073190"
 
         InterstitialAd.load(this, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
                 interstitialAd = ad
-                showInterstitialAd()
+                ad.show(this@MainActivity)
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
                 interstitialAd = null
             }
         })
-    }
-
-    // インタースティシャル広告を表示
-    private fun showInterstitialAd() {
-        interstitialAd?.let { ad ->
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    // 広告が閉じられた時
-                    interstitialAd = null
-                    saveAdDisplayTime()
-                }
-
-                override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                    // 広告表示に失敗した時
-                    interstitialAd = null
-                }
-
-                override fun onAdShowedFullScreenContent() {
-                    // 広告が表示された時
-                    interstitialAd = null
-                }
-            }
-            ad.show(this)
-        }
-    }
-
-    // 広告表示時刻を保存
-    private fun saveAdDisplayTime() {
-        val prefs = getSharedPreferences("ad_settings", Context.MODE_PRIVATE)
-        val currentTime = System.currentTimeMillis()
-        val calendar = Calendar.getInstance()
-        val currentDate = "${calendar.get(Calendar.YEAR)}-${calendar.get(Calendar.MONTH) + 1}-${calendar.get(Calendar.DAY_OF_MONTH)}"
-
-        prefs.edit().apply {
-            putLong("last_ad_time", currentTime)
-            putString("last_ad_date", currentDate)
-            apply()
-        }
     }
 
     // バナー広告を読み込む
