@@ -12,11 +12,7 @@ import kotlinx.coroutines.launch
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import android.widget.TextView
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.AdSize
 import android.widget.FrameLayout
@@ -38,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var isReorderMode = false
 
     // 広告関連
-    private var interstitialAd: InterstitialAd? = null
     private var bannerAdView: AdView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,14 +151,8 @@ class MainActivity : AppCompatActivity() {
         // displayOrderの初期値設定（マイグレーション対応）
         initializeDisplayOrder()
 
-        // AdMob初期化
-        MobileAds.initialize(this) {}
-
         // バナー広告読み込み
         loadBannerAd()
-
-        // インタースティシャル広告読み込み（頻度制限はAdMob側で管理）
-        loadInterstitialAd()
     }
 
     private fun initializeDisplayOrder() {
@@ -1046,6 +1035,10 @@ class MainActivity : AppCompatActivity() {
         // ViewPagerのスワイプを無効化（タブ切り替え禁止）
         viewPager.isUserInputEnabled = false
 
+        // タブを無効化（タップで切り替え禁止）
+        tabLayout.getTabAt(0)?.view?.isEnabled = false
+        tabLayout.getTabAt(1)?.view?.isEnabled = false
+
         // ヘッダーUIを並び替えモード用に変更
         searchButton.visibility = View.GONE
         headerMenuButton.visibility = View.GONE
@@ -1074,28 +1067,15 @@ class MainActivity : AppCompatActivity() {
         // ViewPagerのスワイプを有効化
         viewPager.isUserInputEnabled = true
 
+        // タブを有効化
+        tabLayout.getTabAt(0)?.view?.isEnabled = true
+        tabLayout.getTabAt(1)?.view?.isEnabled = true
+
         // ヘッダーUIを通常モードに戻す
         reorderCancelButton.visibility = View.GONE
         reorderDoneButton.visibility = View.GONE
         searchButton.visibility = View.VISIBLE
         headerMenuButton.visibility = View.VISIBLE
-    }
-
-    // インタースティシャル広告を読み込む
-    private fun loadInterstitialAd() {
-        val adRequest = AdRequest.Builder().build()
-        val adUnitId = "ca-app-pub-5377681981369299/4938073190"
-
-        InterstitialAd.load(this, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
-            override fun onAdLoaded(ad: InterstitialAd) {
-                interstitialAd = ad
-                ad.show(this@MainActivity)
-            }
-
-            override fun onAdFailedToLoad(error: LoadAdError) {
-                interstitialAd = null
-            }
-        })
     }
 
     // バナー広告を読み込む

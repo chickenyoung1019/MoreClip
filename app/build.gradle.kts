@@ -75,6 +75,9 @@ dependencies {
     // Coroutines (lifecycleScope用)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // Lifecycle (ProcessLifecycleOwner用)
+    implementation("androidx.lifecycle:lifecycle-process:2.6.2")
+
     // Google AdMob
     implementation("com.google.android.gms:play-services-ads:23.0.0")
 
