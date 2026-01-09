@@ -28,8 +28,8 @@ class MyApplication : Application(), Application.ActivityLifecycleCallbacks {
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
 
     override fun onActivityStarted(activity: Activity) {
-        if (currentActivity == null) {
-            // アプリがバックグラウンドから戻ってきた時
+        // バックグラウンドから復帰時に広告表示（ProcessTextActivityは除外）
+        if (currentActivity == null && activity !is ProcessTextActivity) {
             Log.d("MyApplication", "App returned to foreground - showing ad")
             appOpenAdManager.showAdIfAvailable()
         }

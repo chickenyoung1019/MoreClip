@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- クリップボード本体 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M17,2H14.82C14.4,0.84 13.3,0 12,0C10.7,0 9.6,0.84 9.18,2H7C5.9,2 5,2.9 5,4V18C5,19.1 5.9,20 7,20H13.5C13.18,19.41 13,18.73 13,18H7V4H9V6H15V4H17V13C17.7,13 18.37,13.13 19,13.35V4C19,2.9 18.1,2 17,2ZM12,4C11.45,4 11,3.55 11,3C11,2.45 11.45,2 12,2C12.55,2 13,2.45 13,3C13,3.55 12.55,4 12,4Z"/>
+
+    <!-- 3本の横線 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,9H16V10.5H8V9Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,12H14V13.5H8V12Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,15H12V16.5H8V15Z"/>
+
+    <!-- 右下の+マーク付き円 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,14C15.79,14 14,15.79 14,18C14,20.21 15.79,22 18,22C20.21,22 22,20.21 22,18C22,15.79 20.21,14 18,14ZM20.5,18.75H18.75V20.5H17.25V18.75H15.5V17.25H17.25V15.5H18.75V17.25H20.5V18.75Z"/>
+</vector>

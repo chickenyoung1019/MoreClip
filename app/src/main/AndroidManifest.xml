@@ -68,7 +68,7 @@
         <!-- クイックタイル -->
         <service
             android:name=".ClipboardTileService"
-            android:icon="@mipmap/moreclip_ic_launcher"
+            android:icon="@drawable/ic_tile_clipboard"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
