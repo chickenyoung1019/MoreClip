@@ -48,7 +48,7 @@ class ClipboardFragment : Fragment() {
             onSelectMode = { enterSelectMode() },
             onAddToTemplate = { memo -> addToTemplate(memo) },
             onSelectionChanged = { selectedIds ->
-                (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
+                (activity as? MainActivity)?.updateSelectCount(selectedIds.size)
             }
         )
         recyclerView.adapter = adapter
@@ -166,12 +166,14 @@ class ClipboardFragment : Fragment() {
 
     private fun enterSelectMode() {
         adapter.enterSelectMode()
+        (activity as? MainActivity)?.enterSelectMode(0)
     }
 
     // 外部から選択モード操作
     fun selectAll() {
         adapter.enterSelectMode()
         adapter.selectAll()
+        (activity as? MainActivity)?.enterSelectMode(adapter.getSelectedItems().size)
     }
     fun deselectAll() = adapter.deselectAll()
     fun getSelectedItems() = adapter.getSelectedItems()

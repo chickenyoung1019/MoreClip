@@ -33,6 +33,15 @@
             android:visibility="gone"
             android:contentDescription="戻る" />
 
+        <!-- クローズボタン（選択モード時に表示） -->
+        <ImageView
+            android:id="@+id/closeSelectModeButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_close"
+            android:visibility="gone"
+            android:contentDescription="選択解除" />
+
         <!-- タイトル -->
         <TextView
             android:id="@+id/headerTitle"
@@ -57,7 +66,7 @@
             android:queryHint="検索..."
             android:visibility="gone" />
 
-        <!-- ゴミ箱 -->
+        <!-- ゴミ箱（選択モード時） -->
         <ImageView
             android:id="@+id/deleteButton"
             android:layout_width="24dp"
@@ -65,6 +74,26 @@
             android:src="@drawable/ic_delete"
             android:visibility="gone"
             android:contentDescription="削除" />
+
+        <!-- 全選択（選択モード時） -->
+        <ImageView
+            android:id="@+id/selectAllButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_select_all"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"
+            android:contentDescription="全て選択" />
+
+        <!-- 定型文に追加（選択モード時・履歴タブのみ） -->
+        <ImageView
+            android:id="@+id/addToTemplateButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_folder_move"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"
+            android:contentDescription="定型文に追加" />
 
         <!-- 並び替えモード：キャンセル -->
         <TextView

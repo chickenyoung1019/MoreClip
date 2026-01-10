@@ -30,8 +30,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchView: androidx.appcompat.widget.SearchView
     private lateinit var reorderCancelButton: TextView
     private lateinit var reorderDoneButton: TextView
+    private lateinit var closeSelectModeButton: ImageView
+    private lateinit var selectAllButton: ImageView
+    private lateinit var addToTemplateButton: ImageView
     private var isSearchMode = false
     private var isReorderMode = false
+    private var isSelectMode = false
 
     // 広告関連
     private var bannerAdView: AdView? = null
@@ -53,6 +57,9 @@ class MainActivity : AppCompatActivity() {
         searchView = findViewById(R.id.searchView)
         reorderCancelButton = findViewById(R.id.reorderCancelButton)
         reorderDoneButton = findViewById(R.id.reorderDoneButton)
+        closeSelectModeButton = findViewById(R.id.closeSelectModeButton)
+        selectAllButton = findViewById(R.id.selectAllButton)
+        addToTemplateButton = findViewById(R.id.addToTemplateButton)
 
         backButton.setOnClickListener {
             if (isSearchMode) {
@@ -60,6 +67,38 @@ class MainActivity : AppCompatActivity() {
             } else {
                 onBackButtonClicked()
             }
+        }
+
+        // 選択モード解除ボタン
+        closeSelectModeButton.setOnClickListener {
+            exitSelectMode()
+        }
+
+        // 全選択ボタン（トグル動作）
+        selectAllButton.setOnClickListener {
+            when (viewPager.currentItem) {
+                0 -> {
+                    val fragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
+                    if (fragment?.isAllSelected() == true) {
+                        fragment.deselectAll()
+                    } else {
+                        fragment?.selectAll()
+                    }
+                }
+                1 -> {
+                    val fragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+                    if (fragment?.isAllSelected() == true) {
+                        fragment.deselectAll()
+                    } else {
+                        fragment?.selectAll()
+                    }
+                }
+            }
+        }
+
+        // 定型文に追加ボタン（履歴タブのみ）
+        addToTemplateButton.setOnClickListener {
+            addSelectedHistoryToTemplate()
         }
 
         // 検索ボタン
@@ -133,18 +172,6 @@ class MainActivity : AppCompatActivity() {
                         templateFragment.exitFolder()
                     }
                 }
-
-                when (position) {
-                    0 -> {
-                        val fragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
-                        fragment?.exitSelectMode()
-                    }
-                    1 -> {  // ← この部分を追加
-                        val fragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
-                        fragment?.exitSelectMode()
-                    }
-                }
-                deleteButton.visibility = View.GONE
             }
         })
 
@@ -191,6 +218,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // 選択モード中なら解除
+        if (isSelectMode) {
+            exitSelectMode()
+            return
+        }
+
         // 検索モード中なら検索解除
         if (isSearchMode) {
             hideSearchBar()
@@ -203,22 +236,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 選択モード中なら解除
-        val hasSelection = when (viewPager.currentItem) {
-            0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.getSelectedItems()?.isNotEmpty() == true
-            1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.getSelectedItems()?.isNotEmpty() == true  // ← 追加
-            else -> false
-        }
-
-        if (hasSelection) {
-            when (viewPager.currentItem) {
-                0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.exitSelectMode()
-                1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.exitSelectMode()  // ← 追加
-            }
-            deleteButton.visibility = View.GONE
-        } else {
-            super.onBackPressed()
-        }
+        super.onBackPressed()
     }
 
     private fun showHeaderMenu(view: View) {
@@ -242,6 +260,10 @@ class MainActivity : AppCompatActivity() {
 
         popup.menu.findItem(R.id.action_select_all)?.isVisible = !isAllSelected
         popup.menu.findItem(R.id.action_deselect_all)?.isVisible = isAllSelected
+
+        // 選択モード時は「並び替え」「設定」を非表示
+        popup.menu.findItem(R.id.action_sort)?.isVisible = !isSelectMode
+        popup.menu.findItem(R.id.action_settings)?.isVisible = !isSelectMode
 
         // 履歴タブの場合、選択モード時のみ「定型文に追加」を表示
         if (viewPager.currentItem == 0) {
@@ -774,7 +796,7 @@ class MainActivity : AppCompatActivity() {
             // 選択モード解除
             val clipboardFragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
             clipboardFragment?.exitSelectMode()
-            deleteButton.visibility = View.GONE
+            resetSelectModeUI()
 
             val message = if (skippedCount > 0) {
                 "${addedCount}件を定型文に追加しました（${skippedCount}件は重複のためスキップ）"
@@ -893,7 +915,7 @@ class MainActivity : AppCompatActivity() {
 
             // 選択モード解除
             templateFragment?.exitSelectMode()
-            deleteButton.visibility = View.GONE
+            resetSelectModeUI()
 
             android.widget.Toast.makeText(
                 this@MainActivity,
@@ -907,20 +929,99 @@ class MainActivity : AppCompatActivity() {
         when (viewPager.currentItem) {
             0 -> {
                 (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.deleteSelectedItems {
-                    deleteButton.visibility = View.GONE
+                    resetSelectModeUI()
                 }
             }
-            1 -> {  // ← 追加
+            1 -> {
                 (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.deleteSelectedItems {
-                    deleteButton.visibility = View.GONE
+                    resetSelectModeUI()
                 }
             }
         }
     }
 
+    // 選択モードUIをリセット（Fragmentは既にexitしている場合用）
+    private fun resetSelectModeUI() {
+        isSelectMode = false
+
+        // タブ切り替えを許可
+        viewPager.isUserInputEnabled = true
+        tabLayout.getTabAt(0)?.view?.isEnabled = true
+        tabLayout.getTabAt(1)?.view?.isEnabled = true
+
+        // ヘッダーUIを通常モードに戻す
+        closeSelectModeButton.visibility = View.GONE
+        headerTitle.text = getString(R.string.app_name)
+        searchButton.visibility = View.VISIBLE
+        selectAllButton.visibility = View.GONE
+        addToTemplateButton.visibility = View.GONE
+        headerMenuButton.visibility = View.VISIBLE
+        deleteButton.visibility = View.GONE
+    }
+
     // Fragmentから呼ばれる公開メソッド
     fun updateDeleteButtonVisibility(visible: Boolean) {
         deleteButton.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
+    // 選択モード開始（Fragmentから呼ばれる）
+    fun enterSelectMode(selectedCount: Int) {
+        isSelectMode = true
+
+        // タブ切り替えを禁止
+        viewPager.isUserInputEnabled = false
+        tabLayout.getTabAt(0)?.view?.isEnabled = false
+        tabLayout.getTabAt(1)?.view?.isEnabled = false
+
+        // ヘッダーUIを選択モード用に変更
+        closeSelectModeButton.visibility = View.VISIBLE
+        headerTitle.text = "${selectedCount}件選択中"
+        searchButton.visibility = View.GONE
+        selectAllButton.visibility = View.VISIBLE
+        // 定型文に追加は履歴タブのみ
+        addToTemplateButton.visibility = if (viewPager.currentItem == 0) View.VISIBLE else View.GONE
+        headerMenuButton.visibility = View.VISIBLE
+        deleteButton.visibility = if (selectedCount > 0) View.VISIBLE else View.GONE
+    }
+
+    // 選択件数更新（Fragmentから呼ばれる）
+    fun updateSelectCount(selectedCount: Int) {
+        if (isSelectMode) {
+            if (selectedCount == 0) {
+                // 選択が0件になったら選択モード終了
+                resetSelectModeUI()
+            } else {
+                headerTitle.text = "${selectedCount}件選択中"
+                deleteButton.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    // 選択モード終了
+    fun exitSelectMode() {
+        if (!isSelectMode) return
+
+        isSelectMode = false
+
+        // 現在のタブのFragmentの選択モードを解除
+        when (viewPager.currentItem) {
+            0 -> (supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment)?.exitSelectMode()
+            1 -> (supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment)?.exitSelectMode()
+        }
+
+        // タブ切り替えを許可
+        viewPager.isUserInputEnabled = true
+        tabLayout.getTabAt(0)?.view?.isEnabled = true
+        tabLayout.getTabAt(1)?.view?.isEnabled = true
+
+        // ヘッダーUIを通常モードに戻す
+        closeSelectModeButton.visibility = View.GONE
+        headerTitle.text = getString(R.string.app_name)
+        searchButton.visibility = View.VISIBLE
+        selectAllButton.visibility = View.GONE
+        addToTemplateButton.visibility = View.GONE
+        headerMenuButton.visibility = View.VISIBLE
+        deleteButton.visibility = View.GONE
     }
 
     private fun onBackButtonClicked() {
