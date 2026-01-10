@@ -96,9 +96,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 定型文に追加ボタン（履歴タブのみ）
+        // フォルダ移動ボタン（履歴: 定型文に追加、定型文: 移動）
         addToTemplateButton.setOnClickListener {
-            addSelectedHistoryToTemplate()
+            when (viewPager.currentItem) {
+                0 -> addSelectedHistoryToTemplate()
+                1 -> moveSelectedTemplates()
+            }
         }
 
         // 検索ボタン
@@ -261,9 +264,10 @@ class MainActivity : AppCompatActivity() {
         popup.menu.findItem(R.id.action_select_all)?.isVisible = !isAllSelected
         popup.menu.findItem(R.id.action_deselect_all)?.isVisible = isAllSelected
 
-        // 選択モード時は「並び替え」「設定」を非表示
+        // 選択モード時は「並び替え」「設定」「定型文を追加」「フォルダ名を変更」を非表示
         popup.menu.findItem(R.id.action_sort)?.isVisible = !isSelectMode
         popup.menu.findItem(R.id.action_settings)?.isVisible = !isSelectMode
+        popup.menu.findItem(R.id.action_add_template)?.isVisible = !isSelectMode
 
         // 履歴タブの場合、選択モード時のみ「定型文に追加」を表示
         if (viewPager.currentItem == 0) {
@@ -271,10 +275,10 @@ class MainActivity : AppCompatActivity() {
             popup.menu.findItem(R.id.action_add_selected_to_template)?.isVisible = hasSelection
         }
 
-        // フォルダ内でのみ「フォルダ名を変更」を表示
+        // フォルダ内でのみ「フォルダ名を変更」を表示（ただし選択モード時は非表示）
         val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
         val isInFolder = templateFragment?.isInFolder() ?: false
-        popup.menu.findItem(R.id.action_rename_folder)?.isVisible = isInFolder
+        popup.menu.findItem(R.id.action_rename_folder)?.isVisible = isInFolder && !isSelectMode
 
         // 定型文タブの場合、選択内容に応じて「移動」を表示
         if (viewPager.currentItem == 1) {
@@ -349,7 +353,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun showAddTemplateDialog() {
+    fun showAddTemplateDialog() {
         val editText = android.widget.EditText(this).apply {
             hint = "定型文を入力"
             setPadding(50, 40, 50, 40)
@@ -580,6 +584,11 @@ class MainActivity : AppCompatActivity() {
             val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
             templateFragment?.loadMemos()
 
+            // 選択モード解除
+            val clipboardFragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
+            clipboardFragment?.exitSelectMode()
+            resetSelectModeUI()
+
             android.widget.Toast.makeText(
                 this@MainActivity,
                 "定型文に追加しました",
@@ -648,12 +657,33 @@ class MainActivity : AppCompatActivity() {
     private fun moveTemplateToFolder(templateMemo: MemoEntity, folder: String?) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
+            val prefs = getSharedPreferences("template_settings", MODE_PRIVATE)
+            val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
+
+            // 重複チェック（自分自身は除外）
+            if (!allowDuplicate) {
+                val allTemplates = db.memoDao().getAllMemos().filter { it.isTemplate && it.id != templateMemo.id }
+                val existing = allTemplates.find { it.content == templateMemo.content && it.folder == folder }
+                if (existing != null) {
+                    android.widget.Toast.makeText(
+                        this@MainActivity,
+                        "移動先に同じ定型文が存在します",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+            }
+
             val updatedMemo = templateMemo.copy(folder = folder)
             db.memoDao().update(updatedMemo)
 
             // 定型文タブを更新
             val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
             templateFragment?.loadMemos()
+
+            // 選択モード解除
+            templateFragment?.exitSelectMode()
+            resetSelectModeUI()
 
             val message = if (folder != null) {
                 "「$folder」に移動しました"
@@ -903,10 +933,28 @@ class MainActivity : AppCompatActivity() {
     private fun moveMultipleTemplates(templates: List<MemoEntity>, folder: String?) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
+            val prefs = getSharedPreferences("template_settings", MODE_PRIVATE)
+            val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
+
+            val templateIds = templates.map { it.id }
+            val allTemplates = db.memoDao().getAllMemos().filter { it.isTemplate && !templateIds.contains(it.id) }
+
+            var movedCount = 0
+            var skippedCount = 0
 
             templates.forEach { template ->
+                // 重複チェック
+                if (!allowDuplicate) {
+                    val existing = allTemplates.find { it.content == template.content && it.folder == folder }
+                    if (existing != null) {
+                        skippedCount++
+                        return@forEach
+                    }
+                }
+
                 val updated = template.copy(folder = folder)
                 db.memoDao().update(updated)
+                movedCount++
             }
 
             // 定型文タブを更新
@@ -917,9 +965,15 @@ class MainActivity : AppCompatActivity() {
             templateFragment?.exitSelectMode()
             resetSelectModeUI()
 
+            val message = if (skippedCount > 0) {
+                "${movedCount}件を移動しました（${skippedCount}件は重複のためスキップ）"
+            } else {
+                "${movedCount}件を移動しました"
+            }
+
             android.widget.Toast.makeText(
                 this@MainActivity,
-                "${templates.size}件を移動しました",
+                message,
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         }
@@ -949,9 +1003,15 @@ class MainActivity : AppCompatActivity() {
         tabLayout.getTabAt(0)?.view?.isEnabled = true
         tabLayout.getTabAt(1)?.view?.isEnabled = true
 
+        // フォルダ内なら←を再表示、タイトルもフォルダ名に
+        val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+        val isInFolder = templateFragment?.isInFolder() == true
+        val folderName = templateFragment?.getCurrentFolderName()
+
         // ヘッダーUIを通常モードに戻す
         closeSelectModeButton.visibility = View.GONE
-        headerTitle.text = getString(R.string.app_name)
+        backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
+        headerTitle.text = if (isInFolder && folderName != null) folderName else getString(R.string.app_name)
         searchButton.visibility = View.VISIBLE
         selectAllButton.visibility = View.GONE
         addToTemplateButton.visibility = View.GONE
@@ -974,12 +1034,15 @@ class MainActivity : AppCompatActivity() {
         tabLayout.getTabAt(1)?.view?.isEnabled = false
 
         // ヘッダーUIを選択モード用に変更
+        backButton.visibility = View.GONE  // フォルダ内でも←を非表示（×と競合するため）
         closeSelectModeButton.visibility = View.VISIBLE
         headerTitle.text = "${selectedCount}件選択中"
         searchButton.visibility = View.GONE
         selectAllButton.visibility = View.VISIBLE
-        // 定型文に追加は履歴タブのみ
-        addToTemplateButton.visibility = if (viewPager.currentItem == 0) View.VISIBLE else View.GONE
+        // フォルダ移動ボタン（履歴: 定型文に追加、定型文: 移動）
+        addToTemplateButton.visibility = View.VISIBLE
+        addToTemplateButton.isEnabled = true
+        addToTemplateButton.alpha = 1.0f
         headerMenuButton.visibility = View.VISIBLE
         deleteButton.visibility = if (selectedCount > 0) View.VISIBLE else View.GONE
     }
@@ -993,6 +1056,24 @@ class MainActivity : AppCompatActivity() {
             } else {
                 headerTitle.text = "${selectedCount}件選択中"
                 deleteButton.visibility = View.VISIBLE
+
+                // 定型文タブでフォルダが選択されている場合、移動ボタンを非活性に
+                if (viewPager.currentItem == 1) {
+                    val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+                    val isInFolder = templateFragment?.isInFolder() == true
+
+                    if (isInFolder) {
+                        // フォルダ内：全て定型文なので常に移動可能
+                        addToTemplateButton.isEnabled = true
+                        addToTemplateButton.alpha = 1.0f
+                    } else {
+                        // フォルダ一覧：フォルダが含まれている場合は非活性に
+                        val selectedItems = templateFragment?.getSelectedItems()
+                        val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } == true
+                        addToTemplateButton.isEnabled = !hasFolder
+                        addToTemplateButton.alpha = if (hasFolder) 0.3f else 1.0f
+                    }
+                }
             }
         }
     }
@@ -1014,9 +1095,15 @@ class MainActivity : AppCompatActivity() {
         tabLayout.getTabAt(0)?.view?.isEnabled = true
         tabLayout.getTabAt(1)?.view?.isEnabled = true
 
+        // フォルダ内なら←を再表示、タイトルもフォルダ名に
+        val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+        val isInFolder = templateFragment?.isInFolder() == true
+        val folderName = templateFragment?.getCurrentFolderName()
+
         // ヘッダーUIを通常モードに戻す
         closeSelectModeButton.visibility = View.GONE
-        headerTitle.text = getString(R.string.app_name)
+        backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
+        headerTitle.text = if (isInFolder && folderName != null) folderName else getString(R.string.app_name)
         searchButton.visibility = View.VISIBLE
         selectAllButton.visibility = View.GONE
         addToTemplateButton.visibility = View.GONE

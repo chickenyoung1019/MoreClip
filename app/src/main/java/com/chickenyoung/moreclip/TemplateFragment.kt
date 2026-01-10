@@ -55,7 +55,7 @@ class TemplateFragment : Fragment() {
             onTemplateMove = { memo -> moveTemplate(memo) },
             onSelectMode = { enterSelectModeForList() },
             onSelectionChanged = { selectedIds ->
-                (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
+                (activity as? MainActivity)?.updateSelectCount(selectedIds.size)
             }
         )
         recyclerView.adapter = adapter
@@ -148,9 +148,9 @@ class TemplateFragment : Fragment() {
                     onEdit = { memo -> editMemo(memo) },
                     onDelete = { memo -> deleteMemo(memo) },
                     onMove = { memo -> moveTemplate(memo) },
-                    onSelectMode = { enterSelectMode() },
+                    onSelectMode = { enterSelectModeForFolder() },
                     onSelectionChanged = { selectedIds ->
-                        (activity as? MainActivity)?.updateDeleteButtonVisibility(selectedIds.isNotEmpty())
+                        (activity as? MainActivity)?.updateSelectCount(selectedIds.size)
                     }
                 )
                 recyclerView.adapter = folderContentAdapter
@@ -258,17 +258,25 @@ class TemplateFragment : Fragment() {
         }
     }
 
-    private fun enterSelectMode() {
+    // フォルダ内で選択モード開始（長押しで自動選択後に呼ばれる）
+    private fun enterSelectModeForFolder() {
         folderContentAdapter?.enterSelectMode()
+        (activity as? MainActivity)?.enterSelectMode(1)
     }
 
     fun selectAll() {
         if (currentFolder != null) {
             folderContentAdapter?.enterSelectMode()
             folderContentAdapter?.selectAll()
+            val count = folderContentAdapter?.getSelectedItems()?.size ?: 0
+            (activity as? MainActivity)?.enterSelectMode(count)
+            (activity as? MainActivity)?.updateSelectCount(count)
         } else {
             adapter.enterSelectMode()
             adapter.selectAll()
+            val count = adapter.getSelectedItems().size
+            (activity as? MainActivity)?.enterSelectMode(count)
+            (activity as? MainActivity)?.updateSelectCount(count)
         }
     }
 
@@ -374,14 +382,10 @@ class TemplateFragment : Fragment() {
         }
     }
 
+    // フォルダ一覧で選択モード開始（長押しで自動選択後に呼ばれる）
     private fun enterSelectModeForList() {
-        if (currentFolder == null) {
-            // フォルダ一覧の選択モード
-            adapter.enterSelectMode()
-        } else {
-            // フォルダ内の選択モード
-            folderContentAdapter?.enterSelectMode()
-        }
+        adapter.enterSelectMode()
+        (activity as? MainActivity)?.enterSelectMode(1)
     }
 
     private fun editFolder(folderName: String) {
