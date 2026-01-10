@@ -46,8 +46,8 @@ class FolderContentAdapter(
         val maxLines = prefs.getInt("max_lines", 3)
         holder.contentText.maxLines = maxLines
 
-        // 日時は非表示
-        holder.dateText.visibility = View.GONE
+        // 日時は空文字（行間を揃えるためViewは残す）
+        holder.dateText.text = ""
 
         when {
             isReorderMode -> {

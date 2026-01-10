@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
-        android:text="履歴がありません"
+        android:text="ブラウザなどでテキスト(文字)選択\n→『︙』三点メニューのMoreClipボードに保存\n（表示がない場合は共有）でテキストを\n履歴に保存できます"
         android:textSize="16sp"
         android:textColor="#999999"
         android:visibility="gone" />
