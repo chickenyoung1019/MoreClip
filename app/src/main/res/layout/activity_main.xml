@@ -118,6 +118,26 @@
             android:layout_marginStart="16dp"
             android:visibility="gone" />
 
+        <!-- 新しいフォルダ（定型文タブのみ） -->
+        <ImageView
+            android:id="@+id/newFolderButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_new_folder"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"
+            android:contentDescription="新しいフォルダ" />
+
+        <!-- 追加（定型文タブのみ） -->
+        <ImageView
+            android:id="@+id/addButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_add"
+            android:layout_marginStart="16dp"
+            android:visibility="gone"
+            android:contentDescription="追加" />
+
         <!-- 検索 -->
         <ImageView
             android:id="@+id/searchButton"

@@ -33,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var closeSelectModeButton: ImageView
     private lateinit var selectAllButton: ImageView
     private lateinit var addToTemplateButton: ImageView
+    private lateinit var addButton: ImageView
+    private lateinit var newFolderButton: ImageView
     private var isSearchMode = false
     private var isReorderMode = false
     private var isSelectMode = false
@@ -60,6 +62,8 @@ class MainActivity : AppCompatActivity() {
         closeSelectModeButton = findViewById(R.id.closeSelectModeButton)
         selectAllButton = findViewById(R.id.selectAllButton)
         addToTemplateButton = findViewById(R.id.addToTemplateButton)
+        addButton = findViewById(R.id.addButton)
+        newFolderButton = findViewById(R.id.newFolderButton)
 
         backButton.setOnClickListener {
             if (isSearchMode) {
@@ -102,6 +106,16 @@ class MainActivity : AppCompatActivity() {
                 0 -> addSelectedHistoryToTemplate()
                 1 -> moveSelectedTemplates()
             }
+        }
+
+        // 新しいフォルダボタン（定型文タブのみ）
+        newFolderButton.setOnClickListener {
+            showCreateFolderDialog()
+        }
+
+        // 追加ボタン（定型文タブのみ）
+        addButton.setOnClickListener {
+            showAddTemplateDialog()
         }
 
         // 検索ボタン
@@ -167,6 +181,10 @@ class MainActivity : AppCompatActivity() {
                 if (isSearchMode) {
                     hideSearchBar()
                 }
+
+                // +ボタン、フォルダ作成ボタンは定型文タブのみ表示
+                addButton.visibility = if (position == 1) View.VISIBLE else View.GONE
+                newFolderButton.visibility = if (position == 1) View.VISIBLE else View.GONE
 
                 // 定型文タブ以外に移動した時、フォルダモードを終了
                 if (position != 1) {
@@ -366,6 +384,56 @@ class MainActivity : AppCompatActivity() {
                 val text = editText.text.toString().trim()
                 if (text.isNotEmpty()) {
                     showFolderSelectionDialog(text)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
+    }
+
+    private fun showCreateFolderDialog() {
+        val editText = android.widget.EditText(this).apply {
+            hint = "フォルダ名"
+            setPadding(50, 40, 50, 40)
+        }
+
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新しいフォルダを作成")
+            .setView(editText)
+            .setPositiveButton("次へ") { _, _ ->
+                val folderName = editText.text.toString().trim()
+                if (folderName.isNotEmpty()) {
+                    showAddTemplateToFolderDialog(folderName)
+                }
+            }
+            .setNegativeButton("キャンセル", null)
+            .show()
+
+        // キーボード自動展開
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        editText.requestFocus()
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
+    }
+
+    private fun showAddTemplateToFolderDialog(folderName: String) {
+        val editText = android.widget.EditText(this).apply {
+            hint = "定型文を入力"
+            setPadding(50, 40, 50, 40)
+        }
+
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("「$folderName」に定型文を追加")
+            .setView(editText)
+            .setPositiveButton("追加") { _, _ ->
+                val text = editText.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    addTemplateWithFolder(text, folderName)
                 }
             }
             .setNegativeButton("キャンセル", null)
@@ -1013,6 +1081,8 @@ class MainActivity : AppCompatActivity() {
         backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
         headerTitle.text = if (isInFolder && folderName != null) folderName else getString(R.string.app_name)
         searchButton.visibility = View.VISIBLE
+        addButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
+        newFolderButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
         selectAllButton.visibility = View.GONE
         addToTemplateButton.visibility = View.GONE
         headerMenuButton.visibility = View.VISIBLE
@@ -1038,6 +1108,8 @@ class MainActivity : AppCompatActivity() {
         closeSelectModeButton.visibility = View.VISIBLE
         headerTitle.text = "${selectedCount}件選択中"
         searchButton.visibility = View.GONE
+        addButton.visibility = View.GONE
+        newFolderButton.visibility = View.GONE
         selectAllButton.visibility = View.VISIBLE
         // フォルダ移動ボタン（履歴: 定型文に追加、定型文: 移動）
         addToTemplateButton.visibility = View.VISIBLE
@@ -1105,6 +1177,8 @@ class MainActivity : AppCompatActivity() {
         backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
         headerTitle.text = if (isInFolder && folderName != null) folderName else getString(R.string.app_name)
         searchButton.visibility = View.VISIBLE
+        addButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
+        newFolderButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
         selectAllButton.visibility = View.GONE
         addToTemplateButton.visibility = View.GONE
         headerMenuButton.visibility = View.VISIBLE
@@ -1168,9 +1242,11 @@ class MainActivity : AppCompatActivity() {
         headerTitle.visibility = View.GONE
         searchView.visibility = View.VISIBLE
 
-        // 戻るボタン表示、検索・メニューボタン非表示
+        // 戻るボタン表示、検索・メニュー・追加・フォルダボタン非表示
         backButton.visibility = View.VISIBLE
         searchButton.visibility = View.GONE
+        addButton.visibility = View.GONE
+        newFolderButton.visibility = View.GONE
         headerMenuButton.visibility = View.GONE
 
         // キーボード表示（少し遅延させる）
@@ -1194,8 +1270,10 @@ class MainActivity : AppCompatActivity() {
         // 戻るボタンはフォルダモード時のみ表示
         backButton.visibility = if (isInFolder) View.VISIBLE else View.GONE
 
-        // 検索・メニューボタン表示
+        // 検索・メニュー・追加・フォルダボタン表示
         searchButton.visibility = View.VISIBLE
+        addButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
+        newFolderButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
         headerMenuButton.visibility = View.VISIBLE
 
         // 検索クリア
@@ -1229,6 +1307,8 @@ class MainActivity : AppCompatActivity() {
 
         // ヘッダーUIを並び替えモード用に変更
         searchButton.visibility = View.GONE
+        addButton.visibility = View.GONE
+        newFolderButton.visibility = View.GONE
         headerMenuButton.visibility = View.GONE
         deleteButton.visibility = View.GONE
         reorderCancelButton.visibility = View.VISIBLE
@@ -1263,6 +1343,8 @@ class MainActivity : AppCompatActivity() {
         reorderCancelButton.visibility = View.GONE
         reorderDoneButton.visibility = View.GONE
         searchButton.visibility = View.VISIBLE
+        addButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
+        newFolderButton.visibility = if (viewPager.currentItem == 1) View.VISIBLE else View.GONE
         headerMenuButton.visibility = View.VISIBLE
     }
 
