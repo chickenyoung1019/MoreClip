@@ -2,6 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="280dp"
+    android:minHeight="280dp"
     android:orientation="vertical"
     android:background="#F5F5F5">
 
@@ -15,7 +16,16 @@
         android:background="#FFFFFF"
         android:elevation="2dp">
 
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone" />
+
         <TextView
+            android:id="@+id/textTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -31,24 +41,27 @@
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- 定型文リスト -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+    <!-- リストエリア（固定高さ） -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="4dp"
-        android:clipToPadding="false" />
+        android:layout_height="236dp">
 
-    <!-- 空の時のメッセージ -->
-    <TextView
-        android:id="@+id/emptyText"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="定型文がありません"
-        android:textColor="#999999"
-        android:visibility="gone" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="4dp"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/emptyText"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="定型文がありません"
+            android:textColor="#999999"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
 </LinearLayout>
