@@ -35,4 +35,8 @@ interface MemoDao {
     // フォルダなしの定型文を取得（並び替えなし）
     @Query("SELECT * FROM memos WHERE isTemplate = 1 AND folder IS NULL")
     suspend fun getTemplatesWithoutFolder(): List<MemoEntity>
+
+    // 全定型文を取得（IME用）
+    @Query("SELECT * FROM memos WHERE isTemplate = 1 ORDER BY displayOrder ASC")
+    suspend fun getAllTemplates(): List<MemoEntity>
 }
