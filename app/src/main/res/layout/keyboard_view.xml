@@ -13,8 +13,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="12dp"
-        android:background="#FFFFFF"
-        android:elevation="2dp">
+        android:background="#F5F5F5">
 
         <ImageView
             android:id="@+id/btnBack"
@@ -22,7 +21,7 @@
             android:layout_height="24dp"
             android:src="@drawable/ic_arrow_back"
             android:layout_marginEnd="8dp"
-            android:visibility="gone" />
+            android:visibility="invisible" />
 
         <TextView
             android:id="@+id/tabTemplate"
@@ -48,12 +47,28 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <Button
-            android:id="@+id/btnSwitchKeyboard"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/btnBackspace"
+            android:layout_width="32dp"
             android:layout_height="32dp"
-            android:text="キーボード"
-            android:textSize="12sp" />
+            android:src="@drawable/ic_backspace"
+            android:padding="4dp"
+            android:layout_marginEnd="14dp" />
+
+        <ImageView
+            android:id="@+id/btnSettings"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_settings"
+            android:padding="4dp"
+            android:layout_marginEnd="14dp" />
+
+        <ImageView
+            android:id="@+id/btnSwitchKeyboard"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_keyboard_language"
+            android:padding="4dp" />
     </LinearLayout>
 
     <!-- リストエリア（固定高さ） -->

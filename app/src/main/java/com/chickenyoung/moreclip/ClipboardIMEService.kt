@@ -1,8 +1,8 @@
 package com.chickenyoung.moreclip
 
+import android.content.Context
 import android.inputmethodservice.InputMethodService
 import android.view.View
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -41,7 +41,7 @@ class ClipboardIMEService : InputMethodService() {
         adapter = IMETemplateAdapter(
             emptyList(),
             onFolderClick = { folderName -> openFolder(folderName) },
-            onTemplateClick = { memo -> currentInputConnection?.commitText(memo.content, 1) }
+            onTemplateClick = { memo -> commitTextAndHandleAfterAction(memo.content) }
         )
         recyclerView?.layoutManager = LinearLayoutManager(this)
         recyclerView?.adapter = adapter
@@ -51,8 +51,16 @@ class ClipboardIMEService : InputMethodService() {
         tabTemplate?.setOnClickListener { switchToTemplate() }
         tabHistory?.setOnClickListener { switchToHistory() }
 
-        view.findViewById<Button>(R.id.btnSwitchKeyboard)?.setOnClickListener {
+        view.findViewById<ImageView>(R.id.btnSwitchKeyboard)?.setOnClickListener {
             switchToPreviousInputMethod()
+        }
+
+        view.findViewById<ImageView>(R.id.btnBackspace)?.setOnClickListener {
+            // バックスペースキーイベントを送信（選択テキストも削除可能）
+            val keyEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)
+            currentInputConnection?.sendKeyEvent(keyEvent)
+            val keyEventUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)
+            currentInputConnection?.sendKeyEvent(keyEventUp)
         }
 
         loadData()
@@ -75,7 +83,7 @@ class ClipboardIMEService : InputMethodService() {
     private fun switchToHistory() {
         isHistoryMode = true
         currentFolder = null
-        btnBack?.visibility = View.GONE
+        btnBack?.visibility = View.INVISIBLE
         updateTabUI()
         loadData()
     }
@@ -102,7 +110,7 @@ class ClipboardIMEService : InputMethodService() {
 
     private fun exitFolder() {
         currentFolder = null
-        btnBack?.visibility = View.GONE
+        btnBack?.visibility = View.INVISIBLE
         loadData()
     }
 
@@ -139,13 +147,41 @@ class ClipboardIMEService : InputMethodService() {
             }
 
             if (items.isEmpty()) {
-                recyclerView?.visibility = View.GONE
+                recyclerView?.visibility = View.INVISIBLE
                 emptyText?.visibility = View.VISIBLE
                 emptyText?.text = if (isHistoryMode) "履歴がありません" else "定型文がありません"
             } else {
                 recyclerView?.visibility = View.VISIBLE
-                emptyText?.visibility = View.GONE
+                emptyText?.visibility = View.INVISIBLE
                 adapter?.updateData(items)
+            }
+        }
+    }
+
+    /**
+     * テキストを入力し、設定に応じた後処理を実行
+     * 設定値: "switch" = 前のキーボードに切り替え, "close" = 閉じる, "stay" = そのまま
+     */
+    private fun commitTextAndHandleAfterAction(text: String) {
+        // テキストを入力
+        currentInputConnection?.commitText(text, 1)
+
+        // 設定を読み取り
+        val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
+        val action = prefs.getString("ime_after_input_action", "switch") ?: "switch"
+
+        when (action) {
+            "switch" -> {
+                // キーボードを閉じてから直前のキーボードに切り替え
+                requestHideSelf(0)
+                switchToPreviousInputMethod()
+            }
+            "close" -> {
+                // キーボードを閉じる（IMEは変わらない）
+                requestHideSelf(0)
+            }
+            "stay" -> {
+                // 何もしない（そのまま）
             }
         }
     }
