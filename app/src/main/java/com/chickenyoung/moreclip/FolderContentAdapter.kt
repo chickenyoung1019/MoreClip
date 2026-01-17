@@ -43,7 +43,7 @@ class FolderContentAdapter(
 
         // 表示行数設定を反映
         val prefs = holder.itemView.context.getSharedPreferences("template_settings", android.content.Context.MODE_PRIVATE)
-        val maxLines = prefs.getInt("max_lines", 3)
+        val maxLines = prefs.getInt("max_lines", 1)
         holder.contentText.maxLines = maxLines
 
         // 日時は空文字（行間を揃えるためViewは残す）
