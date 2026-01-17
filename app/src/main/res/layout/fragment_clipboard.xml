@@ -17,10 +17,14 @@
         android:id="@+id/emptyText"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="ブラウザなどでテキスト(文字)選択\n→『︙』三点メニューのMoreClipボードに保存\n（表示がない場合は共有）でテキストを\n履歴に保存できます\n\n\n保存後リストをタップでクリップボードに\n貼り付けるので再利用できます"
+        android:gravity="start"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="48dp"
+        android:text="(例)\n1. ブラウザなどでテキスト(文字)を長押しで選択\n2. 『コピー』『共有』『すべて選択』『︙』\nなどが表示されるので\n3. 最後の『︙』三点メニューをタップ\n4. MoreClipボードに保存をタップ\n5. (表示がない場合は共有アプリアイコンをタップ)\n6. テキストを履歴に保存できます\n\n※ 保存後、リストをタップするとクリップボードに\nコピーできるので再利用できます"
         android:textSize="16sp"
         android:textColor="#999999"
+        android:lineSpacingExtra="4dp"
         android:visibility="gone" />
 
 </LinearLayout>

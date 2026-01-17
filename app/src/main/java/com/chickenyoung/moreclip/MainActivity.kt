@@ -145,10 +145,15 @@ class MainActivity : AppCompatActivity() {
 
         // タブとViewPagerを連携
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-            tab.text = when (position) {
-                0 -> "履歴"
-                1 -> "定型文"
-                else -> ""
+            when (position) {
+                0 -> {
+                    tab.text = "履歴"
+                    tab.setIcon(R.drawable.ic_clipboard)
+                }
+                1 -> {
+                    tab.text = "定型文"
+                    tab.setIcon(R.drawable.ic_fragment)
+                }
             }
         }.attach()
 

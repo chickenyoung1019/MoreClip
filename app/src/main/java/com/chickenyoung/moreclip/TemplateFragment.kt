@@ -175,7 +175,7 @@ class TemplateFragment : Fragment() {
         Toast.makeText(requireContext(), "クリップボードにコピーしました", Toast.LENGTH_SHORT).show()
 
         val prefs = requireContext().getSharedPreferences("template_settings", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("auto_close", true)) {
+        if (prefs.getBoolean("auto_close", false)) {
             requireActivity().finish()
         }
     }

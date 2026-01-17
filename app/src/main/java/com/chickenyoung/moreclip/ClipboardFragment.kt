@@ -107,7 +107,7 @@ class ClipboardFragment : Fragment() {
             val copiedMemo = allMemos.find { it.content == text }
 
             copiedMemo?.let {
-                if (prefs.getBoolean("move_to_top", true)) {
+                if (prefs.getBoolean("move_to_top", false)) {
                     // 履歴メモのみ取得
                     val historyMemos = db.memoDao().getHistoryMemos()
 
@@ -129,7 +129,7 @@ class ClipboardFragment : Fragment() {
                 }
             }
 
-            if (prefs.getBoolean("auto_close", true)) {
+            if (prefs.getBoolean("auto_close", false)) {
                 requireActivity().finish()
             }
         }

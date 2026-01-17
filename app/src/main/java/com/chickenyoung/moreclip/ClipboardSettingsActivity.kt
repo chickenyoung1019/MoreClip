@@ -46,11 +46,11 @@ class ClipboardSettingsActivity : AppCompatActivity() {
         // SharedPreferencesから設定読み込み
         val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         duplicateSwitch.isChecked = prefs.getBoolean("allow_duplicate", false)
-        autoCloseSwitch.isChecked = prefs.getBoolean("auto_close", true)
-        moveToTopSwitch.isChecked = prefs.getBoolean("move_to_top", true)
+        autoCloseSwitch.isChecked = prefs.getBoolean("auto_close", false)
+        moveToTopSwitch.isChecked = prefs.getBoolean("move_to_top", false)
 
-        // 表示行数の初期値（デフォルトは3行=インデックス2）
-        val maxLines = prefs.getInt("max_lines", 3)
+        // 表示行数の初期値（デフォルトは1行=インデックス0）
+        val maxLines = prefs.getInt("max_lines", 1)
         maxLinesSpinner.setSelection(maxLines - 1)
 
         // スイッチの変更を保存
