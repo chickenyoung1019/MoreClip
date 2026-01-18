@@ -64,6 +64,7 @@
             android:background="#E6F0F9"
             android:iconifiedByDefault="false"
             android:queryHint="検索..."
+            android:theme="@style/SearchViewTheme"
             android:visibility="gone" />
 
         <!-- ゴミ箱（選択モード時） -->
