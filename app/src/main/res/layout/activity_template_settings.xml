@@ -159,7 +159,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:entries="@array/max_lines_options" />
+            android:entries="@array/max_lines_options"
+            android:theme="@style/SpinnerTheme"
+            android:popupTheme="@style/SpinnerTheme" />
     </LinearLayout>
 
     </LinearLayout>

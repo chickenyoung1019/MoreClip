@@ -77,7 +77,20 @@ class TemplateFragment : Fragment() {
                 val folders = db.memoDao().getFolders()
                 val templateItems = mutableListOf<TemplateItem>()
 
-                folders.forEach { folderName ->
+                // 保存されたフォルダ順序を取得
+                val savedFolderOrder = getSavedFolderOrder()
+                val sortedFolders = if (savedFolderOrder.isNotEmpty()) {
+                    // 保存された順序でソート（新しいフォルダは末尾に追加）
+                    folders.sortedBy { folderName ->
+                        val index = savedFolderOrder.indexOf(folderName)
+                        if (index >= 0) index else Int.MAX_VALUE
+                    }
+                } else {
+                    // 保存された順序がない場合はあいうえお順
+                    folders.sorted()
+                }
+
+                sortedFolders.forEach { folderName ->
                     val templatesInFolder = db.memoDao().getTemplatesByFolder(folderName)
                     templateItems.add(TemplateItem.Folder(folderName, templatesInFolder.size))
                 }
@@ -500,8 +513,16 @@ class TemplateFragment : Fragment() {
             lifecycleScope.launch {
                 val db = AppDatabase.getDatabase(requireContext())
                 if (currentFolder == null) {
-                    // フォルダ一覧モード：定型文のみ保存（フォルダは順序なし）
+                    // フォルダ一覧モード：フォルダと定型文の順序を保存
                     val currentList = adapter.getCurrentList()
+
+                    // フォルダ順序を保存
+                    val folderOrder = currentList
+                        .filterIsInstance<TemplateItem.Folder>()
+                        .map { it.name }
+                    saveFolderOrder(folderOrder)
+
+                    // 定型文の順序を保存
                     var order = 0
                     currentList.forEach { item ->
                         if (item is TemplateItem.Template) {
@@ -543,6 +564,24 @@ class TemplateFragment : Fragment() {
         }
         reorderBackupListItems = null
         reorderBackupListMemos = null
+    }
+
+    // フォルダ順序の保存・読み込み
+    private fun getSavedFolderOrder(): List<String> {
+        val prefs = requireContext().getSharedPreferences("template_settings", Context.MODE_PRIVATE)
+        val json = prefs.getString("folder_order", null) ?: return emptyList()
+        return try {
+            val jsonArray = org.json.JSONArray(json)
+            (0 until jsonArray.length()).map { jsonArray.getString(it) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveFolderOrder(folderOrder: List<String>) {
+        val prefs = requireContext().getSharedPreferences("template_settings", Context.MODE_PRIVATE)
+        val jsonArray = org.json.JSONArray(folderOrder)
+        prefs.edit().putString("folder_order", jsonArray.toString()).apply()
     }
 
 }

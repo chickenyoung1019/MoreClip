@@ -20,8 +20,8 @@ interface MemoDao {
     @Update
     suspend fun update(memo: MemoEntity)
 
-    // フォルダ一覧を取得（重複なし）
-    @Query("SELECT DISTINCT folder FROM memos WHERE isTemplate = 1 AND folder IS NOT NULL ORDER BY folder")
+    // フォルダ一覧を取得（重複なし、並び替えはアプリ側で行う）
+    @Query("SELECT DISTINCT folder FROM memos WHERE isTemplate = 1 AND folder IS NOT NULL")
     suspend fun getFolders(): List<String>
 
     // 履歴を取得（並び替えなし）
