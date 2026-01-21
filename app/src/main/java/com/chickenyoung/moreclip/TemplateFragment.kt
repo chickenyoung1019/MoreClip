@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -573,6 +574,7 @@ class TemplateFragment : Fragment() {
             val jsonArray = org.json.JSONArray(json)
             (0 until jsonArray.length()).map { jsonArray.getString(it) }
         } catch (e: Exception) {
+            Log.e("TemplateFragment", "フォルダ順序の読み込みに失敗: ${e.message}")
             emptyList()
         }
     }
