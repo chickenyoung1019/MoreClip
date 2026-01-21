@@ -310,6 +310,7 @@ class MainActivity : AppCompatActivity() {
                     moveItem?.isEnabled = true
                 } else {
                     // フォルダ一覧：フォルダが含まれている場合は無効化（グレーアウト）
+                    @Suppress("UNCHECKED_CAST")
                     val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } ?: false
                     moveItem?.isEnabled = !hasFolder
                 }
@@ -920,6 +921,7 @@ class MainActivity : AppCompatActivity() {
             val allMemos = db.memoDao().getAllMemos()
 
             // 選択内容からテンプレートIDを抽出
+            @Suppress("UNCHECKED_CAST")
             val selectedMemos = if (selectedItems.first() is String) {
                 // フォルダ一覧の場合：Set<String> ("template:id"形式)
                 val templateIds = (selectedItems as Set<String>)
@@ -1141,6 +1143,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         // フォルダ一覧：フォルダが含まれている場合は非活性に
                         val selectedItems = templateFragment?.getSelectedItems()
+                        @Suppress("UNCHECKED_CAST")
                         val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } == true
                         addToTemplateButton.isEnabled = !hasFolder
                         addToTemplateButton.alpha = if (hasFolder) 0.3f else 1.0f

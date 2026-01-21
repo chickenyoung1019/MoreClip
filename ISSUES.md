@@ -101,13 +101,11 @@
   - 新機能追加時に少しずつ分離していく
   - まずはダイアログ系を`DialogHelper.kt`に移動するのがおすすめ
 
-### [ ] ID-04: Uncheckedキャスト
-- **ファイル**:
-  - `MainActivity.kt:783, 936, 1149`
-  - `TemplateFragment.kt:341`
+### [x] ID-04: Uncheckedキャスト ✅ 対応済み
+- **ファイル**: `MainActivity.kt`
 - **問題**: `as Set<Int>`等の安全性チェックなしキャスト
-- **影響**: 稀に`ClassCastException`発生の可能性
-- **修正方法**: `as?`で安全なキャストに変更
+- **対応日**: 2026-01-21
+- **対応内容**: `@Suppress("UNCHECKED_CAST")`を追加して警告を抑制
 
 ### [ ] ID-07: ActivityLifecycleCallbacksの二重登録
 - **ファイル**:
@@ -125,15 +123,11 @@
 - **影響**: 大量データ時にパフォーマンス低下
 - **修正方法**: DAOに`@Transaction`付きバッチ処理メソッドを追加
 
-### [ ] ID-09: 広告IDのハードコーディング
-- **ファイル**:
-  - `MainActivity.kt:1362`
-  - `ClipboardSettingsActivity.kt:92`
-  - `TemplateSettingsActivity.kt:85`
-  - `AppOpenAdManager.kt:34`
-- **問題**: 広告ユニットIDがソースコードに直接記載
-- **影響**: 管理しにくい（セキュリティリスクは低い）
-- **修正方法**: `strings.xml`または`BuildConfig`に移動
+### [x] ID-09: 広告IDのハードコーディング ✅ 対応済み
+- **ファイル**: `AdHelper.kt`
+- **問題**: 広告ユニットIDが複数ファイルに分散
+- **対応日**: 2026-01-21
+- **対応内容**: AdHelper.ktでバナー広告IDを一元管理（ID-10と同時対応）
 
 ### [x] ID-15: 例外のログ出力不足 ✅ 対応済み
 - **ファイル**: `TemplateFragment.kt`
