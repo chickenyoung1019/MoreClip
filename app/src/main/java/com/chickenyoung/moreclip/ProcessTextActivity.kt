@@ -45,15 +45,8 @@ class ProcessTextActivity : AppCompatActivity() {
                     val existing = db.memoDao().getHistoryMemos().find { it.content == text }
                     if (existing != null) {
                         // 重複している場合は日時とdisplayOrderを更新（最新に移動）
-                        val historyMemos = db.memoDao().getHistoryMemos()
-
-                        // 他の履歴のdisplayOrderを1増やす
-                        historyMemos.forEach { memo ->
-                            if (memo.id != existing.id) {
-                                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                                db.memoDao().update(updated)
-                            }
-                        }
+                        // 他の履歴のdisplayOrderを1増やす（1クエリで一括更新）
+                        db.memoDao().incrementHistoryDisplayOrderExcept(existing.id)
 
                         // 既存メモを最新に移動
                         val updated = existing.copy(
@@ -72,12 +65,8 @@ class ProcessTextActivity : AppCompatActivity() {
                 }
 
                 // 新規保存
-                // 既存の履歴のdisplayOrderを1増やす
-                val historyMemos = db.memoDao().getHistoryMemos()
-                historyMemos.forEach { memo ->
-                    val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                    db.memoDao().update(updated)
-                }
+                // 既存の履歴のdisplayOrderを1増やす（1クエリで一括更新）
+                db.memoDao().incrementAllHistoryDisplayOrder()
 
                 // 新規メモをdisplayOrder=0で保存（一番上）
                 db.memoDao().insert(MemoEntity(content = text, displayOrder = 0))

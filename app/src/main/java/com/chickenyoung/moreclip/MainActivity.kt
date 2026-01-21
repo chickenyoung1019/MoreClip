@@ -451,13 +451,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                db.memoDao().update(updated)
-            }
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ、1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolder(folder)
 
             // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
@@ -526,13 +521,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                db.memoDao().update(updated)
-            }
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ、1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolder(folder)
 
             // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
@@ -689,15 +679,8 @@ class MainActivity : AppCompatActivity() {
             var addedCount = 0
             var skippedCount = 0
 
-            // 既存の定型文のdisplayOrderを取得（最大値）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-
-            // 全ての既存定型文のdisplayOrderを履歴件数分増やす
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + historyMemos.size)
-                db.memoDao().update(updated)
-            }
+            // 全ての既存定型文のdisplayOrderを履歴件数分増やす（1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolderBy(folder, historyMemos.size)
 
             historyMemos.forEachIndexed { index, historyMemo ->
                 // 重複チェック

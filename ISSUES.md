@@ -117,13 +117,19 @@
   - AppOpenAdManagerからActivityLifecycleCallbacks実装を削除
   - MyApplicationに一元化、showAdIfAvailable()にActivityを引数で渡す形式に変更
 
-### [ ] ID-08: DBアクセスの非効率（ループ内個別更新）
-- **ファイル**:
-  - `MainActivity.kt` (多数箇所)
-  - `ProcessTextActivity.kt:48-79`
+### [x] ID-08: DBアクセスの非効率（ループ内個別更新） ✅ 対応済み
+- **ファイル**: `MemoDao.kt`, `MainActivity.kt`, `ProcessTextActivity.kt`, `ClipboardFragment.kt`, `TemplateFragment.kt`
 - **問題**: ループ内で1件ずつ`update()`を呼び出し
-- **影響**: 大量データ時にパフォーマンス低下
-- **修正方法**: DAOに`@Transaction`付きバッチ処理メソッドを追加
+- **対応日**: 2026-01-22
+- **対応内容**:
+  - MemoDao.ktにバッチ処理メソッドを追加:
+    - `updateAll()`, `deleteAll()` - バッチ更新/削除
+    - `incrementHistoryDisplayOrderExcept()` - 履歴の順序更新
+    - `incrementAllHistoryDisplayOrder()` - 全履歴の順序更新
+    - `incrementTemplateDisplayOrderInFolder()` - フォルダ内定型文の順序更新
+    - `renameFolder()` - フォルダ名一括変更
+    - `deleteTemplatesInFolder()` - フォルダ内定型文一括削除
+  - 各ファイルのforEachループをバッチ処理呼び出しに置き換え
 
 ### [x] ID-09: 広告IDのハードコーディング ✅ 対応済み
 - **ファイル**: `AdHelper.kt`
