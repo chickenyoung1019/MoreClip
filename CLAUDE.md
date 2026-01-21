@@ -1,5 +1,15 @@
 # Claude Code 開発ガイド
 
+## プロジェクト概要
+
+**アプリ名**: MoreClipボード
+**パッケージ名**: `com.chickenyoung.moreclip`
+**バージョン**: 1.3 (versionCode: 4)
+**SDK**: minSdk 24 / targetSdk 36 / compileSdk 36
+
+クリップボードの履歴管理と定型文の保存ができるAndroidアプリ。
+専用のIME（入力メソッド）も搭載しており、どのアプリからでも定型文を貼り付け可能。
+
 ## 言語設定
 - 常に日本語で会話する
 - コメントも日本語で記述する
@@ -10,6 +20,247 @@
 - **保守性優先**: 複雑な実装より、非エンジニアが理解・保守しやすいコードを重視
 - **段階的実装**: 大きな変更は小分けにして、1ファイルずつ確実に進める
 - **MVP思考**: 完璧を目指さず、動くものを早く作ってフィードバックで改善
+
+---
+
+## アーキテクチャ
+
+### 全体構成図
+```
+MainActivity (タブ切り替え、ヘッダー操作)
+├── ViewPager2 + TabLayout
+│   ├── [タブ0] ClipboardFragment (履歴)
+│   │   └── ClipboardAdapter
+│   └── [タブ1] TemplateFragment (定型文)
+│       ├── TemplateAdapter (フォルダ一覧)
+│       └── FolderContentAdapter (フォルダ内)
+├── ClipboardSettingsActivity (履歴の設定)
+└── TemplateSettingsActivity (定型文の設定)
+
+ClipboardIMEService (専用キーボード)
+└── IMETemplateAdapter
+
+ProcessTextActivity (共有・PROCESS_TEXT受信)
+ClipboardTileService (クイックタイル)
+```
+
+### Fragment vs Activity
+- **Fragment**: タブ内での画面切り替え（自然な遷移）
+- **Activity**: 独立した画面（編集、設定）
+
+### Adapter設計
+- 用途ごとに分離（ClipboardAdapter, TemplateAdapter, FolderContentAdapter, IMETemplateAdapter）
+- 選択モード・並び替えモードは各Adapterで実装
+
+---
+
+## ファイル構成
+
+```
+app/src/main/java/com/chickenyoung/moreclip/
+│
+├── [Activity]
+│   ├── MainActivity.kt           # メイン画面（タブ、ヘッダー操作）
+│   ├── EditMemoActivity.kt       # メモ編集画面
+│   ├── ClipboardSettingsActivity.kt  # 履歴の設定
+│   ├── TemplateSettingsActivity.kt   # 定型文の設定
+│   └── ProcessTextActivity.kt    # 共有/PROCESS_TEXT受信
+│
+├── [Fragment]
+│   ├── ClipboardFragment.kt      # 履歴タブ
+│   └── TemplateFragment.kt       # 定型文タブ
+│
+├── [Adapter]
+│   ├── ClipboardAdapter.kt       # 履歴リスト用
+│   ├── TemplateAdapter.kt        # 定型文+フォルダ一覧用
+│   ├── FolderContentAdapter.kt   # フォルダ内コンテンツ用
+│   ├── IMETemplateAdapter.kt     # IME用（シンプル）
+│   └── ViewPagerAdapter.kt       # ViewPager2用
+│
+├── [データベース]
+│   ├── AppDatabase.kt            # Room Database (version: 5)
+│   ├── MemoDao.kt                # データアクセス
+│   └── MemoEntity.kt             # エンティティ
+│
+├── [モデル]
+│   └── TemplateItem.kt           # sealed class（Folder/Template）
+│
+├── [サービス]
+│   ├── ClipboardIMEService.kt    # 専用IME（入力メソッド）
+│   └── ClipboardTileService.kt   # クイックタイル
+│
+└── [広告]
+    ├── MyApplication.kt          # Application初期化
+    └── AppOpenAdManager.kt       # App Open Ads管理
+```
+
+---
+
+## データベース
+
+### MemoEntity
+```kotlin
+@Entity(tableName = "memos")
+data class MemoEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val content: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val isTemplate: Boolean = false,  // false:履歴, true:定型文
+    val folder: String? = null,       // フォルダ名（nullはフォルダなし）
+    val displayOrder: Int = 0         // 並び替え用順序
+)
+```
+
+### 主要なDAOメソッド
+| メソッド | 用途 |
+|---------|------|
+| `getHistoryMemos()` | 履歴のみ取得 |
+| `getAllTemplates()` | 全定型文をdisplayOrder順で取得 |
+| `getTemplatesByFolder(name)` | 特定フォルダ内の定型文取得 |
+| `getTemplatesWithoutFolder()` | フォルダなしの定型文取得 |
+| `getFolders()` | フォルダ一覧取得（重複なし） |
+
+### データベース変更時の注意
+1. `AppDatabase.kt`のversion番号を上げる
+2. `fallbackToDestructiveMigration()`を使用中（データ消去で移行）
+3. テスト時はアプリを再インストール
+
+---
+
+## SharedPreferences
+
+### 設定ファイル一覧
+| ファイル名 | 用途 | 主なキー |
+|-----------|------|---------|
+| `app_settings` | 履歴の設定 | `allow_duplicate`, `auto_close`, `move_to_top`, `max_lines` |
+| `template_settings` | 定型文の設定 | `allow_duplicate`, `auto_close`, `max_lines`, `folder_order` |
+| `ime_settings` | IMEの設定 | `ime_after_input_action` |
+
+### 参照方法
+```kotlin
+// 履歴設定
+val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+
+// 定型文設定
+val prefs = getSharedPreferences("template_settings", Context.MODE_PRIVATE)
+
+// IME設定
+val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
+```
+
+### フォルダ順序の保存（JSON形式）
+```kotlin
+// 保存
+val jsonArray = JSONArray(folderOrder)
+prefs.edit().putString("folder_order", jsonArray.toString()).apply()
+
+// 読み込み
+val json = prefs.getString("folder_order", null)
+val jsonArray = JSONArray(json)
+```
+
+---
+
+## displayOrder管理（並び替え機能）
+
+### 基本ルール
+- 新しいアイテムは`displayOrder = 0`で追加
+- 他のアイテムは`displayOrder + 1`でずらす
+- 並び替え保存時は位置に応じてdisplayOrderを再設定
+
+### フォルダ順序
+- SharedPreferencesの`folder_order`にJSONArrayで保存
+- 新しいフォルダは末尾に追加される
+
+---
+
+## モード切り替え
+
+### 通常モード → 選択モード
+```
+長押し → enterSelectMode() → 自動で該当アイテム選択
+├── タブ切り替え禁止
+├── ヘッダーUIを選択用に変更
+└── 0件になったら自動解除
+```
+
+### 通常モード → 並び替えモード
+```
+メニュー「並び替え」→ enterReorderMode()
+├── タブ切り替え禁止
+├── ItemTouchHelperでドラッグ有効化
+└── 完了/キャンセルで終了
+```
+
+### フォルダモード
+```
+定型文タブ → フォルダをタップ → フォルダ内表示
+├── TemplateAdapter → FolderContentAdapter に切り替え
+├── ヘッダーに←ボタン表示
+└── タイトルをフォルダ名に変更
+```
+
+---
+
+## IME（入力メソッド）
+
+### ClipboardIMEService
+- 専用キーボードとして動作
+- 定型文タブと履歴タブを切り替え可能
+- フォルダ階層表示対応
+
+### 入力後のアクション（ime_after_input_action）
+| 値 | 動作 |
+|---|-----|
+| `switch` | 前のキーボードに切り替え |
+| `close` | キーボードを閉じる |
+| `stay` | そのまま（何もしない） |
+
+---
+
+## 広告（Google AdMob）
+
+### 広告ID
+| 種類 | ID |
+|-----|-----|
+| App ID | `ca-app-pub-5377681981369299~3584613013` |
+| バナー広告 | `ca-app-pub-5377681981369299/6584173262` |
+| App Open広告 | `ca-app-pub-5377681981369299/6075663533` |
+
+### 表示場所
+- バナー広告: MainActivity、設定画面
+- App Open広告: アプリ起動時（ProcessTextActivity除外）
+
+---
+
+## よくある実装パターン
+
+### Fragment取得
+```kotlin
+// ViewPager2のFragment取得
+val clipboardFragment = supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
+val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
+```
+
+### 選択モード判定（TemplateFragment）
+```kotlin
+if (currentFolder != null) {
+    // フォルダ内: folderContentAdapterを使用
+} else {
+    // フォルダ一覧: adapterを使用
+}
+```
+
+### Adapterでのモード切り替え
+```kotlin
+when {
+    isReorderMode -> { /* 並び替えモード */ }
+    isSelectMode -> { /* 選択モード */ }
+    else -> { /* 通常モード */ }
+}
+```
+
+---
 
 ## 開発の進め方
 
@@ -24,111 +275,60 @@
 - エラー時は該当ファイル全体を共有
 - 複数ファイル変更は段階的に（1ファイル→確認→次）
 
-### コミュニケーション
-- 簡潔な説明（コンテキスト節約）
-- 不要な確認は削減
-- 非エンジニア向けに図解・具体例で説明
+### 決断パターン
+| 状況 | 方針 |
+|-----|------|
+| 複雑 vs 保守性 | 常に保守性を優先 |
+| 実装順序 | 簡単 or 基盤となるもの優先 |
+| 不明点 | 非エンジニア向けに具体例で説明 |
 
-## 決断パターン
+---
 
-### 複雑 vs 保守性
-→ **常に保守性を優先**
-例: ファイル統合より分離（ClipboardとTemplateを別ファイル）
+## 命名規約
 
-### 実装順序
-→ **簡単なもの or 基盤となるもの優先**
-例: 選択削除実装後、個別削除を追加
+| 種類 | 規約 | 例 |
+|-----|------|-----|
+| Activity | 機能名 + Activity | `ClipboardSettingsActivity` |
+| Fragment | 機能名 + Fragment | `TemplateFragment` |
+| Adapter | 用途 + Adapter | `FolderContentAdapter` |
+| Service | 機能名 + Service | `ClipboardIMEService` |
 
-### 不明点の説明
-→ **非エンジニア向けに具体例で**
-例: コールバック方式 vs 直接呼び出し方式の比較図
+---
 
-## アーキテクチャ原則
+## 現在の機能一覧
 
-### Fragment vs Activity
-- Fragment: タブ内での画面切り替え（自然な遷移）
-- Activity: 独立した画面（編集、設定）
+### 履歴タブ
+- クリップボードへのコピー
+- 編集・削除
+- 選択モード（複数選択・削除）
+- 並び替えモード（ドラッグ&ドロップ）
+- 定型文への追加
+- 検索
 
-### Adapter設計
-- 用途ごとに分離（ClipboardAdapter, TemplateAdapter, FolderContentAdapter）
-- 選択モードは各Adapterで実装
+### 定型文タブ
+- フォルダ管理（作成・名前変更・削除）
+- フォルダ内表示
+- 選択モード（フォルダ+定型文）
+- 並び替えモード（フォルダ順序も保存）
+- 移動機能
+- 検索
 
-### 設定管理
-- SharedPreferences使用
-- 機能ごとに分離（app_settings, template_settings）
-- デバッグしやすさ優先
+### IME
+- 定型文/履歴タブ切り替え
+- フォルダ階層表示
+- バックスペース機能
+- 入力後アクション設定
 
-## 実装時の注意点
+### その他
+- クイックタイル
+- PROCESS_TEXT / SEND intent対応
+- App Open広告
 
-### データベース変更
-- version番号を上げる
-- fallbackToDestructiveMigration()使用
-- テスト時はアプリ再インストール
+---
 
-### 選択モード実装
-- 長押しで開始 + 自動選択
-- タップで選択/解除
-- ゴミ箱ボタンで削除
-- 全画面で統一されたUX
+## 今後の拡張ポイント
 
-### タブ切り替え
-- 選択モード解除
-- ゴミ箱非表示
-- Fragment状態リセット
-
-## コード規約
-
-### 命名
-- Activity: 機能名 + Activity（例: ClipboardSettingsActivity）
-- Fragment: 機能名 + Fragment
-- Adapter: 用途 + Adapter
-
-### ファイル構成
-```
-app/src/main/java/com/example/myclipboardapp/
-├── MainActivity.kt
-├── ClipboardFragment.kt
-├── TemplateFragment.kt
-├── ClipboardAdapter.kt
-├── TemplateAdapter.kt
-├── FolderContentAdapter.kt
-├── EditMemoActivity.kt
-├── ClipboardSettingsActivity.kt
-├── TemplateSettingsActivity.kt
-├── MemoEntity.kt
-├── MemoDao.kt
-├── AppDatabase.kt
-├── TemplateItem.kt (sealed class)
-└── ViewPagerAdapter.kt
-```
-
-## よくある問題と解決
-
-### Fragment取得
-```kotlin
-// ViewPager2のFragment取得
-supportFragmentManager.findFragmentByTag("f0") as? ClipboardFragment
-supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
-```
-
-### 選択モード判定
-```kotlin
-// フォルダ内 vs フォルダ外
-if (currentFolder != null) {
-    // フォルダ内処理
-} else {
-    // フォルダ外処理
-}
-```
-
-### 設定参照
-```kotlin
-// 履歴
-val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-// 定型文
-val prefs = getSharedPreferences("template_settings", Context.MODE_PRIVATE)
-```
-
-## 次回実装予定
-1. 画面間移動（履歴⇔定型文⇔フォルダ内）
-2. 並び替え・検索
+- IME設定画面（現在は未実装）
+- バックアップ/リストア機能
+- タグ機能
+- 統計/使用頻度表示
