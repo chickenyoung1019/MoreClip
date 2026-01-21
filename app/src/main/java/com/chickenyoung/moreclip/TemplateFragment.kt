@@ -23,7 +23,6 @@ class TemplateFragment : Fragment() {
     private lateinit var emptyText: TextView
     private lateinit var adapter: TemplateAdapter
     private var currentFolder: String? = null  // null = フォルダ一覧表示中
-    private lateinit var backButton: View  // 戻るボタン（後で追加）
     private var folderContentAdapter: FolderContentAdapter? = null
     private var allTemplateItems: List<TemplateItem> = emptyList()
     private var allFolderMemos: List<MemoEntity> = emptyList()

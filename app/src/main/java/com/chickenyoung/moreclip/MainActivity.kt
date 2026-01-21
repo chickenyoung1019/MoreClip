@@ -5,7 +5,9 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.PopupMenu
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.viewpager2.widget.ViewPager2
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -47,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // ステータスバーの文字色を黒にする
-        window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
 
         tabLayout = findViewById(R.id.tabLayout)
         viewPager = findViewById(R.id.viewPager)
@@ -206,6 +208,27 @@ class MainActivity : AppCompatActivity() {
 
         // バナー広告読み込み
         loadBannerAd()
+
+        // 戻るボタンの処理
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                when {
+                    // 並び替えモード中ならキャンセル
+                    isReorderMode -> exitReorderMode(save = false)
+                    // 選択モード中なら解除
+                    isSelectMode -> exitSelectMode()
+                    // 検索モード中なら検索解除
+                    isSearchMode -> hideSearchBar()
+                    // フォルダモード中なら戻る
+                    backButton.visibility == View.VISIBLE -> onBackButtonClicked()
+                    // それ以外はアプリ終了
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        })
     }
 
     private fun initializeDisplayOrder() {
@@ -235,34 +258,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    override fun onBackPressed() {
-        // 並び替えモード中ならキャンセル
-        if (isReorderMode) {
-            exitReorderMode(save = false)
-            return
-        }
-
-        // 選択モード中なら解除
-        if (isSelectMode) {
-            exitSelectMode()
-            return
-        }
-
-        // 検索モード中なら検索解除
-        if (isSearchMode) {
-            hideSearchBar()
-            return
-        }
-
-        // フォルダモード中なら戻る
-        if (backButton.visibility == View.VISIBLE) {
-            onBackButtonClicked()
-            return
-        }
-
-        super.onBackPressed()
     }
 
     private fun showHeaderMenu(view: View) {
@@ -1382,4 +1377,8 @@ class MainActivity : AppCompatActivity() {
         return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
     }
 
+    override fun onDestroy() {
+        bannerAdView?.destroy()
+        super.onDestroy()
+    }
 }

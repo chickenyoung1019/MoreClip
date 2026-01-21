@@ -9,32 +9,20 @@
 
 ## 緊急度：高（すぐ直すべき）
 
-### [ ] ID-05: IMEのCoroutineScopeリーク
+### [x] ID-05: IMEのCoroutineScopeリーク ✅ 対応済み
 - **ファイル**: `ClipboardIMEService.kt:21`
 - **問題**: サービス終了時にCoroutineScopeがキャンセルされていない
-- **影響**: メモリリーク、クラッシュの可能性
-- **修正方法**:
-```kotlin
-override fun onDestroy() {
-    super.onDestroy()
-    serviceScope.cancel()
-}
-```
+- **対応日**: 2026-01-21
+- **対応内容**: `onDestroy()`を追加し、`serviceScope.cancel()`を実行
 
-### [ ] ID-06: AdViewのメモリリーク
+### [x] ID-06: AdViewのメモリリーク ✅ 対応済み
 - **ファイル**:
-  - `MainActivity.kt:43`
-  - `ClipboardSettingsActivity.kt:22`
-  - `TemplateSettingsActivity.kt:21`
+  - `MainActivity.kt`
+  - `ClipboardSettingsActivity.kt`
+  - `TemplateSettingsActivity.kt`
 - **問題**: Activity終了時にAdViewが破棄されていない
-- **影響**: メモリリーク
-- **修正方法**: 各Activityに追加
-```kotlin
-override fun onDestroy() {
-    bannerAdView?.destroy()
-    super.onDestroy()
-}
-```
+- **対応日**: 2026-01-21
+- **対応内容**: 各Activityに`onDestroy()`を追加し、`bannerAdView?.destroy()`を実行
 
 ### [ ] ID-14: データベースマイグレーション
 - **ファイル**: `AppDatabase.kt:23`
@@ -60,28 +48,24 @@ override fun onDestroy() {
 - **修正方法**: `DiffUtil`を導入するか、`notifyItemChanged()`等を使用
 - **備考**: アイテム数が少ない現状では体感差なし。余裕があれば対応
 
-### [ ] ID-03: Deprecated API使用
+### [x] ID-03: Deprecated API使用 ✅ 対応済み
 - **ファイル**:
-  - `MainActivity.kt:50, 240`
-  - `ClipboardSettingsActivity.kt:32`
-  - `TemplateSettingsActivity.kt:31`
+  - `MainActivity.kt`
+  - `ClipboardSettingsActivity.kt`
+  - `TemplateSettingsActivity.kt`
 - **問題**:
   - `SYSTEM_UI_FLAG_LIGHT_STATUS_BAR` (API 30で非推奨)
   - `onBackPressed()` (API 33で非推奨)
-- **影響**: 将来のAndroidで動作しなくなる可能性
-- **修正方法**:
-  - ステータスバー: `WindowInsetsControllerCompat`使用
-  - バックボタン: `OnBackPressedCallback`使用
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - ステータスバー: `WindowInsetsControllerCompat`に変更
+  - バックボタン: `OnBackPressedCallback`に変更
 
-### [ ] ID-02: 未使用のプロパティ
-- **ファイル**: `TemplateFragment.kt:26`
+### [x] ID-02: 未使用のプロパティ ✅ 対応済み
+- **ファイル**: `TemplateFragment.kt`
 - **問題**: `backButton: View`が宣言のみで未使用
-- **影響**: アクセスすると`UninitializedPropertyAccessException`
-- **修正方法**: この行を削除
-```kotlin
-// 削除する行
-private lateinit var backButton: View
-```
+- **対応日**: 2026-01-21
+- **対応内容**: 未使用の`backButton`プロパティを削除
 
 ---
 
