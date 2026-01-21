@@ -24,14 +24,14 @@
 - **対応日**: 2026-01-21
 - **対応内容**: 各Activityに`onDestroy()`を追加し、`bannerAdView?.destroy()`を実行
 
-### [ ] ID-14: データベースマイグレーション
-- **ファイル**: `AppDatabase.kt:23`
+### [x] ID-14: データベースマイグレーション ✅ 対応済み
+- **ファイル**: `AppDatabase.kt`
 - **問題**: `fallbackToDestructiveMigration()`使用でデータ消失リスク
-- **影響**: アプリ更新時にユーザーデータが全消失
-- **対応方針**:
-  - 開発中は現状維持でOK（CLAUDE.mdに記載済み）
-  - **本番リリース前**に適切なMigration実装を検討
-- **備考**: 現時点では対応不要
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - `fallbackToDestructiveMigration()`を削除
+  - Migrationの書き方をコメントで明記
+  - CLAUDE.mdにスキーマ変更手順を追記
 
 ---
 

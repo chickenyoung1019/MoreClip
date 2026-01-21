@@ -120,10 +120,21 @@ data class MemoEntity(
 | `getTemplatesWithoutFolder()` | フォルダなしの定型文取得 |
 | `getFolders()` | フォルダ一覧取得（重複なし） |
 
-### データベース変更時の注意
-1. `AppDatabase.kt`のversion番号を上げる
-2. `fallbackToDestructiveMigration()`を使用中（データ消去で移行）
-3. テスト時はアプリを再インストール
+### データベース変更時の注意（重要）
+スキーマ変更時は**必ずMigrationを書くこと**。書かないとユーザーデータが消失する。
+
+1. `MemoEntity.kt`に列を追加/変更
+2. `AppDatabase.kt`のversion番号を上げる（例: 5 → 6）
+3. Migrationを追加:
+```kotlin
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE memos ADD COLUMN newColumn TEXT DEFAULT ''")
+    }
+}
+```
+4. `.addMigrations(MIGRATION_5_6)`を追加
+5. テスト時は**アプリを再インストールせず**、更新で動作確認
 
 ---
 
