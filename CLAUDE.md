@@ -89,10 +89,13 @@ app/src/main/java/com/chickenyoung/moreclip/
 │   ├── ClipboardIMEService.kt    # 専用IME（入力メソッド）
 │   └── ClipboardTileService.kt   # クイックタイル
 │
+├── [ヘルパー]
+│   ├── AdHelper.kt               # バナー広告ヘルパー
+│   └── DialogHelper.kt           # ダイアログ表示ヘルパー
+│
 └── [広告]
     ├── MyApplication.kt          # Application初期化
-    ├── AppOpenAdManager.kt       # App Open Ads管理
-    └── AdHelper.kt               # バナー広告ヘルパー
+    └── AppOpenAdManager.kt       # App Open Ads管理
 ```
 
 ---
