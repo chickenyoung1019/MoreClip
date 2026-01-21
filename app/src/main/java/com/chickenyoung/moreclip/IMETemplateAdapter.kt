@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
 /**
@@ -78,7 +79,40 @@ class IMETemplateAdapter(
     override fun getItemCount() = items.size
 
     fun updateData(newItems: List<TemplateItem>) {
+        val diffCallback = TemplateItemDiffCallback(items, newItems)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
         items = newItems
-        notifyDataSetChanged()
+        diffResult.dispatchUpdatesTo(this)
+    }
+
+    // DiffUtilコールバック
+    private class TemplateItemDiffCallback(
+        private val oldList: List<TemplateItem>,
+        private val newList: List<TemplateItem>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize() = oldList.size
+        override fun getNewListSize() = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return when {
+                old is TemplateItem.Folder && new is TemplateItem.Folder -> old.name == new.name
+                old is TemplateItem.Template && new is TemplateItem.Template -> old.memo.id == new.memo.id
+                else -> false
+            }
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return when {
+                old is TemplateItem.Folder && new is TemplateItem.Folder ->
+                    old.name == new.name && old.count == new.count
+                old is TemplateItem.Template && new is TemplateItem.Template ->
+                    old.memo.content == new.memo.content && old.memo.folder == new.memo.folder
+                else -> false
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -130,35 +131,38 @@ class FolderContentAdapter(
 
         if (selectedItems.isEmpty()) {
             exitSelectMode()
+        } else {
+            // 選択状態が変わったアイテムのみ更新
+            val position = memos.indexOfFirst { it.id == memoId }
+            if (position >= 0) {
+                notifyItemChanged(position)
+            }
         }
-
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
     fun enterSelectMode() {
         isSelectMode = true
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun exitSelectMode() {
         isSelectMode = false
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun selectAll() {
         selectedItems.clear()
         selectedItems.addAll(memos.map { it.id })
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
         onSelectionChanged(selectedItems)
     }
 
     fun deselectAll() {
         selectedItems.clear()
         exitSelectMode()
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
@@ -167,19 +171,40 @@ class FolderContentAdapter(
     fun isAllSelected(): Boolean = selectedItems.size == memos.size && memos.isNotEmpty()
 
     fun updateData(newMemos: List<MemoEntity>) {
+        val diffCallback = MemoDiffCallback(memos, newMemos)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
         memos = newMemos
-        notifyDataSetChanged()
+        diffResult.dispatchUpdatesTo(this)
     }
 
     // 並び替えモード
     fun enterReorderMode() {
         isReorderMode = true
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun exitReorderMode() {
         isReorderMode = false
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
+    }
+
+    // DiffUtilコールバック
+    private class MemoDiffCallback(
+        private val oldList: List<MemoEntity>,
+        private val newList: List<MemoEntity>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize() = oldList.size
+        override fun getNewListSize() = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition].id == newList[newItemPosition].id
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return old.content == new.content && old.createdAt == new.createdAt
+        }
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {

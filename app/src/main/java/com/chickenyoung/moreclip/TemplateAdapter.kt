@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
 class TemplateAdapter(
@@ -239,22 +240,31 @@ class TemplateAdapter(
 
         if (selectedItems.isEmpty()) {
             exitSelectMode()
+        } else {
+            // 選択状態が変わったアイテムのみ更新
+            val position = items.indexOfFirst { item ->
+                when (item) {
+                    is TemplateItem.Folder -> "folder:${item.name}" == itemKey
+                    is TemplateItem.Template -> "template:${item.memo.id}" == itemKey
+                }
+            }
+            if (position >= 0) {
+                notifyItemChanged(position)
+            }
         }
-
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
     fun enterSelectMode() {
         isSelectMode = true
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun exitSelectMode() {
         isSelectMode = false
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun selectAll() {
@@ -265,14 +275,13 @@ class TemplateAdapter(
                 is TemplateItem.Template -> selectedItems.add("template:${item.memo.id}")
             }
         }
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
         onSelectionChanged(selectedItems)
     }
 
     fun deselectAll() {
         selectedItems.clear()
         exitSelectMode()
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
@@ -281,19 +290,21 @@ class TemplateAdapter(
     fun isAllSelected(): Boolean = selectedItems.size == items.size && items.isNotEmpty()
 
     fun updateData(newItems: List<TemplateItem>) {
+        val diffCallback = TemplateItemDiffCallback(items, newItems)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
         items = newItems
-        notifyDataSetChanged()
+        diffResult.dispatchUpdatesTo(this)
     }
 
     // 並び替えモード
     fun enterReorderMode() {
         isReorderMode = true
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun exitReorderMode() {
         isReorderMode = false
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {
@@ -305,4 +316,35 @@ class TemplateAdapter(
     }
 
     fun getCurrentList(): List<TemplateItem> = items
+
+    // DiffUtilコールバック
+    private class TemplateItemDiffCallback(
+        private val oldList: List<TemplateItem>,
+        private val newList: List<TemplateItem>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize() = oldList.size
+        override fun getNewListSize() = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return when {
+                old is TemplateItem.Folder && new is TemplateItem.Folder -> old.name == new.name
+                old is TemplateItem.Template && new is TemplateItem.Template -> old.memo.id == new.memo.id
+                else -> false
+            }
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return when {
+                old is TemplateItem.Folder && new is TemplateItem.Folder ->
+                    old.name == new.name && old.count == new.count
+                old is TemplateItem.Template && new is TemplateItem.Template ->
+                    old.memo.content == new.memo.content
+                else -> false
+            }
+        }
+    }
 }

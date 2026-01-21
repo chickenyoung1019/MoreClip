@@ -37,16 +37,19 @@
 
 ## 緊急度：中（近いうちに直すべき）
 
-### [ ] ID-01: notifyDataSetChanged()の乱用
+### [x] ID-01: notifyDataSetChanged()の乱用 ✅ 対応済み
 - **ファイル**:
-  - `ClipboardAdapter.kt` (8箇所)
-  - `TemplateAdapter.kt` (8箇所)
-  - `FolderContentAdapter.kt` (8箇所)
-  - `IMETemplateAdapter.kt` (1箇所)
+  - `ClipboardAdapter.kt`
+  - `TemplateAdapter.kt`
+  - `FolderContentAdapter.kt`
+  - `IMETemplateAdapter.kt`
 - **問題**: リスト全体を再描画するため非効率
-- **影響**: スクロールのカクつき、ちらつき
-- **修正方法**: `DiffUtil`を導入するか、`notifyItemChanged()`等を使用
-- **備考**: アイテム数が少ない現状では体感差なし。余裕があれば対応
+- **対応日**: 2026-01-22
+- **対応内容**:
+  - 各AdapterにDiffUtilコールバックを実装
+  - updateData()でDiffUtil.calculateDiff()を使用
+  - モード切替時はnotifyItemRangeChanged()に変更
+  - 選択切替時はnotifyItemChanged()で個別更新
 
 ### [x] ID-03: Deprecated API使用 ✅ 対応済み
 - **ファイル**:
