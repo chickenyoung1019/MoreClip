@@ -2,7 +2,6 @@ package com.chickenyoung.moreclip
 
 import android.app.Activity
 import android.app.Application
-import android.os.Bundle
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -11,16 +10,13 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.appopen.AppOpenAd
 import java.util.Date
 
-class AppOpenAdManager(private val application: Application) : Application.ActivityLifecycleCallbacks {
+class AppOpenAdManager(private val application: Application) {
 
     private var appOpenAd: AppOpenAd? = null
-    private var currentActivity: Activity? = null
     private var isShowingAd = false
     private var loadTime: Long = 0
-    private var isFirstLoad = true // 初回読み込みフラグ
 
     init {
-        application.registerActivityLifecycleCallbacks(this)
         fetchAd()
     }
 
@@ -42,17 +38,10 @@ class AppOpenAdManager(private val application: Application) : Application.Activ
                     appOpenAd = ad
                     loadTime = Date().time
                     Log.d("AppOpenAd", "広告読み込み成功")
-
-                    // 初回読み込み時のみ自動表示
-                    if (isFirstLoad) {
-                        isFirstLoad = false
-                        showAdIfAvailable()
-                    }
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     appOpenAd = null
-                    isFirstLoad = false
                     Log.e("AppOpenAd", "広告読み込み失敗: ${error.message}")
                 }
             }
@@ -66,51 +55,37 @@ class AppOpenAdManager(private val application: Application) : Application.Activ
         return appOpenAd != null && wasLoadTimeLessThanNHoursAgo
     }
 
-    // 広告を表示
-    fun showAdIfAvailable() {
+    /**
+     * 広告を表示
+     * @param activity 広告を表示するActivity
+     */
+    fun showAdIfAvailable(activity: Activity) {
         if (!isShowingAd && isAdAvailable()) {
-            currentActivity?.let { activity ->
-                appOpenAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
-                    override fun onAdDismissedFullScreenContent() {
-                        appOpenAd = null
-                        isShowingAd = false
-                        fetchAd() // 次の広告を読み込む
-                        Log.d("AppOpenAd", "広告を閉じた")
-                    }
-
-                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                        appOpenAd = null
-                        isShowingAd = false
-                        fetchAd()
-                        Log.e("AppOpenAd", "広告表示失敗: ${error.message}")
-                    }
-
-                    override fun onAdShowedFullScreenContent() {
-                        isShowingAd = true
-                        Log.d("AppOpenAd", "広告を表示")
-                    }
+            appOpenAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    appOpenAd = null
+                    isShowingAd = false
+                    fetchAd() // 次の広告を読み込む
+                    Log.d("AppOpenAd", "広告を閉じた")
                 }
 
-                appOpenAd?.show(activity)
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    appOpenAd = null
+                    isShowingAd = false
+                    fetchAd()
+                    Log.e("AppOpenAd", "広告表示失敗: ${error.message}")
+                }
+
+                override fun onAdShowedFullScreenContent() {
+                    isShowingAd = true
+                    Log.d("AppOpenAd", "広告を表示")
+                }
             }
+
+            appOpenAd?.show(activity)
         } else {
             Log.d("AppOpenAd", "広告が利用不可")
             fetchAd()
-        }
-    }
-
-    // ActivityLifecycleCallbacks
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-    override fun onActivityStarted(activity: Activity) {
-        currentActivity = activity
-    }
-    override fun onActivityResumed(activity: Activity) {}
-    override fun onActivityPaused(activity: Activity) {}
-    override fun onActivityStopped(activity: Activity) {}
-    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-    override fun onActivityDestroyed(activity: Activity) {
-        if (currentActivity == activity) {
-            currentActivity = null
         }
     }
 }

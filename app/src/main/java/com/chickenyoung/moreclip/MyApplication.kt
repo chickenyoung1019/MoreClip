@@ -31,7 +31,7 @@ class MyApplication : Application(), Application.ActivityLifecycleCallbacks {
         // バックグラウンドから復帰時に広告表示（ProcessTextActivityは除外）
         if (currentActivity == null && activity !is ProcessTextActivity) {
             Log.d("MyApplication", "App returned to foreground - showing ad")
-            appOpenAdManager.showAdIfAvailable()
+            appOpenAdManager.showAdIfAvailable(activity)
         }
         currentActivity = activity
     }

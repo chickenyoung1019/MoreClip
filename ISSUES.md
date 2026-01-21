@@ -107,13 +107,13 @@
 - **対応日**: 2026-01-21
 - **対応内容**: `@Suppress("UNCHECKED_CAST")`を追加して警告を抑制
 
-### [ ] ID-07: ActivityLifecycleCallbacksの二重登録
-- **ファイル**:
-  - `AppOpenAdManager.kt:23`
-  - `MyApplication.kt:25`
+### [x] ID-07: ActivityLifecycleCallbacksの二重登録 ✅ 対応済み
+- **ファイル**: `AppOpenAdManager.kt`, `MyApplication.kt`
 - **問題**: 同じイベントに対して2つのコールバック
-- **影響**: 予期しない動作の可能性
-- **修正方法**: 片方に統一
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - AppOpenAdManagerからActivityLifecycleCallbacks実装を削除
+  - MyApplicationに一元化、showAdIfAvailable()にActivityを引数で渡す形式に変更
 
 ### [ ] ID-08: DBアクセスの非効率（ループ内個別更新）
 - **ファイル**:
