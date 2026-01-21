@@ -91,7 +91,8 @@ app/src/main/java/com/chickenyoung/moreclip/
 │
 └── [広告]
     ├── MyApplication.kt          # Application初期化
-    └── AppOpenAdManager.kt       # App Open Ads管理
+    ├── AppOpenAdManager.kt       # App Open Ads管理
+    └── AdHelper.kt               # バナー広告ヘルパー
 ```
 
 ---

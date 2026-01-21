@@ -10,8 +10,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.WindowInsetsControllerCompat
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 
 class ClipboardSettingsActivity : AppCompatActivity() {
@@ -88,27 +86,7 @@ class ClipboardSettingsActivity : AppCompatActivity() {
     // バナー広告を読み込む
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
-
-        bannerAdView = AdView(this).apply {
-            adUnitId = "ca-app-pub-5377681981369299/6584173262"
-            setAdSize(getAdaptiveBannerAdSize())
-        }
-
-        adContainer.removeAllViews()
-        adContainer.addView(bannerAdView)
-
-        val adRequest = AdRequest.Builder().build()
-        bannerAdView?.loadAd(adRequest)
-    }
-
-    // アダプティブバナーのサイズを取得
-    private fun getAdaptiveBannerAdSize(): AdSize {
-        val displayMetrics = resources.displayMetrics
-        val adWidthPixels = displayMetrics.widthPixels.toFloat()
-        val density = displayMetrics.density
-        val adWidth = (adWidthPixels / density).toInt()
-
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+        bannerAdView = AdHelper.loadBannerAd(this, adContainer)
     }
 
     override fun onDestroy() {

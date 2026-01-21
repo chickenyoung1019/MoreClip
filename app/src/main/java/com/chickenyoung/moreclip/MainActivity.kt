@@ -1351,30 +1351,7 @@ class MainActivity : AppCompatActivity() {
     // バナー広告を読み込む
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
-
-        // AdViewを作成
-        bannerAdView = AdView(this).apply {
-            adUnitId = "ca-app-pub-5377681981369299/6584173262" // 本番バナー広告ID
-            setAdSize(getAdaptiveBannerAdSize())
-        }
-
-        // AdViewをコンテナに追加
-        adContainer.removeAllViews()
-        adContainer.addView(bannerAdView)
-
-        // 広告を読み込む
-        val adRequest = AdRequest.Builder().build()
-        bannerAdView?.loadAd(adRequest)
-    }
-
-    // アダプティブバナーのサイズを取得
-    private fun getAdaptiveBannerAdSize(): AdSize {
-        val displayMetrics = resources.displayMetrics
-        val adWidthPixels = displayMetrics.widthPixels.toFloat()
-        val density = displayMetrics.density
-        val adWidth = (adWidthPixels / density).toInt()
-
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+        bannerAdView = AdHelper.loadBannerAd(this, adContainer)
     }
 
     override fun onDestroy() {
