@@ -24,8 +24,8 @@ class ClipboardIMEService : InputMethodService() {
     private var recyclerView: RecyclerView? = null
     private var emptyText: TextView? = null
     private var btnBack: ImageView? = null
-    private var tabTemplate: TextView? = null
-    private var tabHistory: TextView? = null
+    private var tabTemplate: ImageView? = null
+    private var tabHistory: ImageView? = null
 
     private var currentFolder: String? = null
     private var isHistoryMode = false
@@ -64,6 +64,7 @@ class ClipboardIMEService : InputMethodService() {
             currentInputConnection?.sendKeyEvent(keyEventUp)
         }
 
+        updateTabUI()
         loadData()
 
         return view
@@ -91,15 +92,11 @@ class ClipboardIMEService : InputMethodService() {
 
     private fun updateTabUI() {
         if (isHistoryMode) {
-            tabTemplate?.setTextColor(0xFF888888.toInt())
-            tabTemplate?.setTypeface(null, android.graphics.Typeface.NORMAL)
-            tabHistory?.setTextColor(0xFF1976D2.toInt())
-            tabHistory?.setTypeface(null, android.graphics.Typeface.BOLD)
+            tabTemplate?.setColorFilter(0xFF888888.toInt())
+            tabHistory?.setColorFilter(0xFF1976D2.toInt())
         } else {
-            tabTemplate?.setTextColor(0xFF1976D2.toInt())
-            tabTemplate?.setTypeface(null, android.graphics.Typeface.BOLD)
-            tabHistory?.setTextColor(0xFF888888.toInt())
-            tabHistory?.setTypeface(null, android.graphics.Typeface.NORMAL)
+            tabTemplate?.setColorFilter(0xFF1976D2.toInt())
+            tabHistory?.setColorFilter(0xFF888888.toInt())
         }
     }
 
