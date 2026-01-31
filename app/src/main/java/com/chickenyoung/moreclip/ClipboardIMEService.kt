@@ -2,6 +2,8 @@ package com.chickenyoung.moreclip
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
 import android.view.MotionEvent
 import android.view.View
@@ -41,7 +43,14 @@ class ClipboardIMEService : InputMethodService() {
     private var lastCommittedTextLength: Int = 0
     private var isHistoryMode = false
 
+    // キャッシュ
+    private var cachedHistoryItems: List<TemplateItem> = emptyList()
+    private var cachedTemplateItems: List<TemplateItem> = emptyList()
+    private var cachedFolderContents: MutableMap<String, List<TemplateItem>> = mutableMapOf()
+
     override fun onCreateInputView(): View {
+        window?.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#F5F5F5")))
+
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
 
         recyclerView = view.findViewById(R.id.recyclerView)
@@ -56,6 +65,7 @@ class ClipboardIMEService : InputMethodService() {
             onTemplateClick = { memo -> commitTextAndHandleAfterAction(memo.content) }
         )
         recyclerView?.layoutManager = LinearLayoutManager(this)
+        recyclerView?.itemAnimator = null
         recyclerView?.adapter = adapter
 
         btnBack?.setOnClickListener { exitFolder() }
@@ -96,14 +106,14 @@ class ClipboardIMEService : InputMethodService() {
         }
 
         updateTabUI()
-        loadData()
+        refreshCache()
 
         return view
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        loadData()
+        refreshCache()
     }
 
     private fun switchToTemplate() {
@@ -111,7 +121,7 @@ class ClipboardIMEService : InputMethodService() {
         currentFolder = null
         disableUndo()
         updateTabUI()
-        loadData()
+        showCachedData()
     }
 
     private fun switchToHistory() {
@@ -120,7 +130,7 @@ class ClipboardIMEService : InputMethodService() {
         btnBack?.visibility = View.INVISIBLE
         disableUndo()
         updateTabUI()
-        loadData()
+        showCachedData()
     }
 
     private fun updateTabUI() {
@@ -137,57 +147,62 @@ class ClipboardIMEService : InputMethodService() {
         currentFolder = folderName
         btnBack?.visibility = View.VISIBLE
         disableUndo()
-        loadData()
+        showCachedData()
     }
 
     private fun exitFolder() {
         currentFolder = null
         btnBack?.visibility = View.INVISIBLE
         disableUndo()
-        loadData()
+        showCachedData()
     }
 
-    private fun loadData() {
+    private fun refreshCache() {
         serviceScope.launch {
-            val items = withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 val db = AppDatabase.getDatabase(applicationContext)
 
-                if (isHistoryMode) {
-                    // 履歴モード
-                    val history = db.memoDao().getHistoryMemos()
-                        .sortedByDescending { it.createdAt }
-                    history.map { TemplateItem.Template(it) }
-                } else if (currentFolder == null) {
-                    // 定型文モード（フォルダ一覧）
-                    val templateItems = mutableListOf<TemplateItem>()
-                    val folders = db.memoDao().getFolders()
-                    for (folderName in folders) {
-                        val count = db.memoDao().getTemplatesByFolder(folderName).size
-                        templateItems.add(TemplateItem.Folder(folderName, count))
-                    }
-                    val templates = db.memoDao().getTemplatesWithoutFolder()
-                        .sortedBy { it.displayOrder }
-                    for (memo in templates) {
-                        templateItems.add(TemplateItem.Template(memo))
-                    }
-                    templateItems
-                } else {
-                    // フォルダ内
-                    val templates = db.memoDao().getTemplatesByFolder(currentFolder!!)
-                        .sortedBy { it.displayOrder }
-                    templates.map { TemplateItem.Template(it) }
-                }
-            }
+                // 履歴キャッシュ
+                cachedHistoryItems = db.memoDao().getHistoryMemos()
+                    .sortedByDescending { it.createdAt }
+                    .map { TemplateItem.Template(it) }
 
-            if (items.isEmpty()) {
-                recyclerView?.visibility = View.INVISIBLE
-                emptyText?.visibility = View.VISIBLE
-                emptyText?.text = if (isHistoryMode) "履歴がありません" else "定型文がありません"
-            } else {
-                recyclerView?.visibility = View.VISIBLE
-                emptyText?.visibility = View.INVISIBLE
-                adapter?.updateData(items)
+                // 定型文キャッシュ（フォルダ一覧）
+                val templateItems = mutableListOf<TemplateItem>()
+                val folders = db.memoDao().getFolders()
+                cachedFolderContents.clear()
+                for (folderName in folders) {
+                    val folderTemplates = db.memoDao().getTemplatesByFolder(folderName)
+                        .sortedBy { it.displayOrder }
+                    templateItems.add(TemplateItem.Folder(folderName, folderTemplates.size))
+                    cachedFolderContents[folderName] = folderTemplates.map { TemplateItem.Template(it) }
+                }
+                val templates = db.memoDao().getTemplatesWithoutFolder()
+                    .sortedBy { it.displayOrder }
+                for (memo in templates) {
+                    templateItems.add(TemplateItem.Template(memo))
+                }
+                cachedTemplateItems = templateItems
             }
+            showCachedData()
+        }
+    }
+
+    private fun showCachedData() {
+        val items = when {
+            isHistoryMode -> cachedHistoryItems
+            currentFolder != null -> cachedFolderContents[currentFolder] ?: emptyList()
+            else -> cachedTemplateItems
+        }
+
+        if (items.isEmpty()) {
+            recyclerView?.visibility = View.INVISIBLE
+            emptyText?.visibility = View.VISIBLE
+            emptyText?.text = if (isHistoryMode) "履歴がありません" else "定型文がありません"
+        } else {
+            recyclerView?.visibility = View.VISIBLE
+            emptyText?.visibility = View.INVISIBLE
+            adapter?.updateData(items)
         }
     }
 

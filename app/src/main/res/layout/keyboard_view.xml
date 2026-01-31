@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="280dp"
-    android:minHeight="280dp"
+    android:layout_height="272dp"
+    android:minHeight="272dp"
     android:orientation="vertical"
     android:background="#F5F5F5">
 
@@ -88,10 +88,10 @@
             android:padding="4dp" />
     </LinearLayout>
 
-    <!-- リストエリア（固定高さ） -->
+    <!-- リストエリア -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="236dp">
+        android:layout_height="228dp">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerView"
