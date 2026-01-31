@@ -44,6 +44,26 @@
             android:layout_weight="1" />
 
         <ImageView
+            android:id="@+id/btnUndo"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_undo"
+            android:padding="4dp"
+            android:layout_marginEnd="8dp" />
+
+        <Switch
+            android:id="@+id/switchClose"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp" />
+
+        <Switch
+            android:id="@+id/switchChange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="14dp" />
+
+        <ImageView
             android:id="@+id/btnBackspace"
             android:layout_width="32dp"
             android:layout_height="32dp"
@@ -87,6 +107,20 @@
             android:gravity="center"
             android:text="定型文がありません"
             android:textColor="#999999"
+            android:visibility="gone" />
+
+        <!-- トースト代替メッセージ -->
+        <TextView
+            android:id="@+id/toastMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="#CC333333"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
             android:visibility="gone" />
 
     </FrameLayout>

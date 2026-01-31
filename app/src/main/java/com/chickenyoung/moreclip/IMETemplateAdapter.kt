@@ -1,8 +1,10 @@
 package com.chickenyoung.moreclip
 
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -59,6 +61,10 @@ class IMETemplateAdapter(
                 h.itemView.setOnClickListener {
                     onFolderClick(item.name)
                 }
+                h.itemView.setOnLongClickListener { view ->
+                    showPreview(view, item.name)
+                    true
+                }
             }
             is TemplateItem.Template -> {
                 val h = holder as TemplateViewHolder
@@ -72,11 +78,32 @@ class IMETemplateAdapter(
                 h.itemView.setOnClickListener {
                     onTemplateClick(item.memo)
                 }
+                h.itemView.setOnLongClickListener { view ->
+                    showPreview(view, item.memo.content)
+                    true
+                }
             }
         }
     }
 
     override fun getItemCount() = items.size
+
+    private fun showPreview(anchorView: View, text: String) {
+        val context = anchorView.context
+        val popupView = LayoutInflater.from(context).inflate(R.layout.popup_preview, null)
+        val previewText = popupView.findViewById<TextView>(R.id.previewText)
+        previewText.text = text
+
+        val popupWindow = PopupWindow(
+            popupView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        )
+        popupWindow.isOutsideTouchable = true
+        popupWindow.elevation = 8f
+        popupWindow.showAtLocation(anchorView, Gravity.CENTER, 0, 0)
+    }
 
     fun updateData(newItems: List<TemplateItem>) {
         val diffCallback = TemplateItemDiffCallback(items, newItems)

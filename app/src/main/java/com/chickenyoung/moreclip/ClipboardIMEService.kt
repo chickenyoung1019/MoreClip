@@ -1,9 +1,14 @@
 package com.chickenyoung.moreclip
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.inputmethodservice.InputMethodService
+import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
+import android.widget.Switch
+import android.os.Handler
+import android.os.Looper
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,8 +31,14 @@ class ClipboardIMEService : InputMethodService() {
     private var btnBack: ImageView? = null
     private var tabTemplate: ImageView? = null
     private var tabHistory: ImageView? = null
+    private var switchClose: Switch? = null
+    private var switchChange: Switch? = null
+    private var toastMessage: TextView? = null
+    private var btnUndo: ImageView? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     private var currentFolder: String? = null
+    private var lastCommittedTextLength: Int = 0
     private var isHistoryMode = false
 
     override fun onCreateInputView(): View {
@@ -56,12 +67,32 @@ class ClipboardIMEService : InputMethodService() {
             switchToPreviousInputMethod()
         }
 
-        view.findViewById<ImageView>(R.id.btnBackspace)?.setOnClickListener {
-            // バックスペースキーイベントを送信（選択テキストも削除可能）
-            val keyEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)
-            currentInputConnection?.sendKeyEvent(keyEvent)
-            val keyEventUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)
-            currentInputConnection?.sendKeyEvent(keyEventUp)
+        setupBackspaceButton(view.findViewById(R.id.btnBackspace))
+
+        // Undoボタンの初期化
+        btnUndo = view.findViewById(R.id.btnUndo)
+        btnUndo?.setColorFilter(0xFF888888.toInt())
+        btnUndo?.setOnClickListener { undoLastCommit() }
+
+        // トグルスイッチの初期化
+        val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
+        switchClose = view.findViewById(R.id.switchClose)
+        switchChange = view.findViewById(R.id.switchChange)
+        toastMessage = view.findViewById(R.id.toastMessage)
+
+        switchClose?.isChecked = prefs.getBoolean("ime_close_after_input", false)
+        switchChange?.isChecked = prefs.getBoolean("ime_switch_after_input", true)
+
+        switchClose?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("ime_close_after_input", isChecked).apply()
+            val msg = if (isChecked) "入力後にキーボードを閉じます" else "入力後もキーボードを表示します"
+            showMessage(msg)
+        }
+
+        switchChange?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("ime_switch_after_input", isChecked).apply()
+            val msg = if (isChecked) "入力後に前のキーボードに切り替えます" else "入力後もこのキーボードのままです"
+            showMessage(msg)
         }
 
         updateTabUI()
@@ -78,6 +109,7 @@ class ClipboardIMEService : InputMethodService() {
     private fun switchToTemplate() {
         isHistoryMode = false
         currentFolder = null
+        disableUndo()
         updateTabUI()
         loadData()
     }
@@ -86,6 +118,7 @@ class ClipboardIMEService : InputMethodService() {
         isHistoryMode = true
         currentFolder = null
         btnBack?.visibility = View.INVISIBLE
+        disableUndo()
         updateTabUI()
         loadData()
     }
@@ -103,12 +136,14 @@ class ClipboardIMEService : InputMethodService() {
     private fun openFolder(folderName: String) {
         currentFolder = folderName
         btnBack?.visibility = View.VISIBLE
+        disableUndo()
         loadData()
     }
 
     private fun exitFolder() {
         currentFolder = null
         btnBack?.visibility = View.INVISIBLE
+        disableUndo()
         loadData()
     }
 
@@ -158,34 +193,81 @@ class ClipboardIMEService : InputMethodService() {
 
     /**
      * テキストを入力し、設定に応じた後処理を実行
-     * 設定値: "switch" = 前のキーボードに切り替え, "close" = 閉じる, "stay" = そのまま
      */
     private fun commitTextAndHandleAfterAction(text: String) {
-        // テキストを入力
+        lastCommittedTextLength = text.length
         currentInputConnection?.commitText(text, 1)
+        btnUndo?.setColorFilter(0xFF1976D2.toInt())
 
-        // 設定を読み取り
-        val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
-        val action = prefs.getString("ime_after_input_action", "switch") ?: "switch"
+        val shouldClose = switchClose?.isChecked ?: false
+        val shouldSwitch = switchChange?.isChecked ?: true
 
-        when (action) {
-            "switch" -> {
-                // キーボードを閉じてから直前のキーボードに切り替え
-                requestHideSelf(0)
-                switchToPreviousInputMethod()
-            }
-            "close" -> {
-                // キーボードを閉じる（IMEは変わらない）
-                requestHideSelf(0)
-            }
-            "stay" -> {
-                // 何もしない（そのまま）
+        if (shouldClose) {
+            requestHideSelf(0)
+        }
+        if (shouldSwitch) {
+            switchToPreviousInputMethod()
+        }
+    }
+
+    private fun undoLastCommit() {
+        if (lastCommittedTextLength > 0) {
+            currentInputConnection?.deleteSurroundingText(lastCommittedTextLength, 0)
+            lastCommittedTextLength = 0
+            btnUndo?.setColorFilter(0xFF888888.toInt())
+        }
+    }
+
+    private fun disableUndo() {
+        lastCommittedTextLength = 0
+        btnUndo?.setColorFilter(0xFF888888.toInt())
+    }
+
+    private val backspaceRunnable = object : Runnable {
+        override fun run() {
+            sendBackspaceKey()
+            handler.postDelayed(this, 50)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupBackspaceButton(btn: ImageView?) {
+        btn?.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendBackspaceKey()
+                    handler.postDelayed(backspaceRunnable, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(backspaceRunnable)
+                    true
+                }
+                else -> false
             }
         }
     }
 
+    private fun sendBackspaceKey() {
+        disableUndo()
+        val keyDown = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)
+        currentInputConnection?.sendKeyEvent(keyDown)
+        val keyUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)
+        currentInputConnection?.sendKeyEvent(keyUp)
+    }
+
+    private fun showMessage(msg: String) {
+        handler.removeCallbacksAndMessages(null)
+        toastMessage?.text = msg
+        toastMessage?.visibility = View.VISIBLE
+        handler.postDelayed({
+            toastMessage?.visibility = View.GONE
+        }, 2000)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
         serviceScope.cancel()
     }
 }
