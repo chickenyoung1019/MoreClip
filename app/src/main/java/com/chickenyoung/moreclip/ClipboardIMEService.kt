@@ -21,12 +21,16 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * 貼り付け専用IME
- */
 class ClipboardIMEService : InputMethodService() {
 
+    companion object {
+        private const val COLOR_ACTIVE = 0xFF1976D2.toInt()
+        private const val COLOR_DISABLED = 0xFF888888.toInt()
+    }
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val handler = Handler(Looper.getMainLooper())
+
     private var adapter: IMETemplateAdapter? = null
     private var recyclerView: RecyclerView? = null
     private var emptyText: TextView? = null
@@ -37,13 +41,11 @@ class ClipboardIMEService : InputMethodService() {
     private var switchChange: Switch? = null
     private var toastMessage: TextView? = null
     private var btnUndo: ImageView? = null
-    private val handler = Handler(Looper.getMainLooper())
 
     private var currentFolder: String? = null
-    private var lastCommittedTextLength: Int = 0
+    private var lastCommittedTextLength = 0
     private var isHistoryMode = false
 
-    // キャッシュ
     private var cachedHistoryItems: List<TemplateItem> = emptyList()
     private var cachedTemplateItems: List<TemplateItem> = emptyList()
     private var cachedFolderContents: MutableMap<String, List<TemplateItem>> = mutableMapOf()
@@ -61,30 +63,25 @@ class ClipboardIMEService : InputMethodService() {
 
         adapter = IMETemplateAdapter(
             emptyList(),
-            onFolderClick = { folderName -> openFolder(folderName) },
-            onTemplateClick = { memo -> commitTextAndHandleAfterAction(memo.content) }
+            onFolderClick = { setFolder(it) },
+            onTemplateClick = { commitTextAndHandleAfterAction(it.content) }
         )
         recyclerView?.layoutManager = LinearLayoutManager(this)
         recyclerView?.itemAnimator = null
         recyclerView?.adapter = adapter
 
-        btnBack?.setOnClickListener { exitFolder() }
-
-        tabTemplate?.setOnClickListener { switchToTemplate() }
-        tabHistory?.setOnClickListener { switchToHistory() }
-
-        view.findViewById<ImageView>(R.id.btnSwitchKeyboard)?.setOnClickListener {
-            switchToPreviousInputMethod()
-        }
+        btnBack?.setOnClickListener { setFolder(null) }
+        tabTemplate?.setOnClickListener { switchMode(historyMode = false) }
+        tabHistory?.setOnClickListener { switchMode(historyMode = true) }
+        view.findViewById<ImageView>(R.id.btnSwitchKeyboard)?.setOnClickListener { switchToPreviousInputMethod() }
 
         setupBackspaceButton(view.findViewById(R.id.btnBackspace))
 
-        // Undoボタンの初期化
-        btnUndo = view.findViewById(R.id.btnUndo)
-        btnUndo?.setColorFilter(0xFF888888.toInt())
-        btnUndo?.setOnClickListener { undoLastCommit() }
+        btnUndo = view.findViewById<ImageView>(R.id.btnUndo)?.apply {
+            setColorFilter(COLOR_DISABLED)
+            setOnClickListener { undoLastCommit() }
+        }
 
-        // トグルスイッチの初期化
         val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
         switchClose = view.findViewById(R.id.switchClose)
         switchChange = view.findViewById(R.id.switchChange)
@@ -95,14 +92,12 @@ class ClipboardIMEService : InputMethodService() {
 
         switchClose?.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("ime_close_after_input", isChecked).apply()
-            val msg = if (isChecked) "入力後にキーボードを閉じます" else "入力後もキーボードを表示します"
-            showMessage(msg)
+            showMessage(if (isChecked) "入力後にキーボードを閉じます" else "入力後もキーボードを表示します")
         }
 
         switchChange?.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("ime_switch_after_input", isChecked).apply()
-            val msg = if (isChecked) "入力後に前のキーボードに切り替えます" else "入力後もこのキーボードのままです"
-            showMessage(msg)
+            showMessage(if (isChecked) "入力後に前のキーボードに切り替えます" else "入力後もこのキーボードのままです")
         }
 
         updateTabUI()
@@ -116,16 +111,8 @@ class ClipboardIMEService : InputMethodService() {
         refreshCache()
     }
 
-    private fun switchToTemplate() {
-        isHistoryMode = false
-        currentFolder = null
-        disableUndo()
-        updateTabUI()
-        showCachedData()
-    }
-
-    private fun switchToHistory() {
-        isHistoryMode = true
+    private fun switchMode(historyMode: Boolean) {
+        isHistoryMode = historyMode
         currentFolder = null
         btnBack?.visibility = View.INVISIBLE
         disableUndo()
@@ -134,25 +121,18 @@ class ClipboardIMEService : InputMethodService() {
     }
 
     private fun updateTabUI() {
-        if (isHistoryMode) {
-            tabTemplate?.setColorFilter(0xFF888888.toInt())
-            tabHistory?.setColorFilter(0xFF1976D2.toInt())
+        val (templateColor, historyColor) = if (isHistoryMode) {
+            COLOR_DISABLED to COLOR_ACTIVE
         } else {
-            tabTemplate?.setColorFilter(0xFF1976D2.toInt())
-            tabHistory?.setColorFilter(0xFF888888.toInt())
+            COLOR_ACTIVE to COLOR_DISABLED
         }
+        tabTemplate?.setColorFilter(templateColor)
+        tabHistory?.setColorFilter(historyColor)
     }
 
-    private fun openFolder(folderName: String) {
+    private fun setFolder(folderName: String?) {
         currentFolder = folderName
-        btnBack?.visibility = View.VISIBLE
-        disableUndo()
-        showCachedData()
-    }
-
-    private fun exitFolder() {
-        currentFolder = null
-        btnBack?.visibility = View.INVISIBLE
+        btnBack?.visibility = if (folderName != null) View.VISIBLE else View.INVISIBLE
         disableUndo()
         showCachedData()
     }
@@ -206,36 +186,24 @@ class ClipboardIMEService : InputMethodService() {
         }
     }
 
-    /**
-     * テキストを入力し、設定に応じた後処理を実行
-     */
     private fun commitTextAndHandleAfterAction(text: String) {
         lastCommittedTextLength = text.length
         currentInputConnection?.commitText(text, 1)
-        btnUndo?.setColorFilter(0xFF1976D2.toInt())
+        btnUndo?.setColorFilter(COLOR_ACTIVE)
 
-        val shouldClose = switchClose?.isChecked ?: false
-        val shouldSwitch = switchChange?.isChecked ?: true
-
-        if (shouldClose) {
-            requestHideSelf(0)
-        }
-        if (shouldSwitch) {
-            switchToPreviousInputMethod()
-        }
+        if (switchClose?.isChecked == true) requestHideSelf(0)
+        if (switchChange?.isChecked != false) switchToPreviousInputMethod()
     }
 
     private fun undoLastCommit() {
-        if (lastCommittedTextLength > 0) {
-            currentInputConnection?.deleteSurroundingText(lastCommittedTextLength, 0)
-            lastCommittedTextLength = 0
-            btnUndo?.setColorFilter(0xFF888888.toInt())
-        }
+        if (lastCommittedTextLength <= 0) return
+        currentInputConnection?.deleteSurroundingText(lastCommittedTextLength, 0)
+        disableUndo()
     }
 
     private fun disableUndo() {
         lastCommittedTextLength = 0
-        btnUndo?.setColorFilter(0xFF888888.toInt())
+        btnUndo?.setColorFilter(COLOR_DISABLED)
     }
 
     private val backspaceRunnable = object : Runnable {
@@ -265,10 +233,10 @@ class ClipboardIMEService : InputMethodService() {
 
     private fun sendBackspaceKey() {
         disableUndo()
-        val keyDown = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)
-        currentInputConnection?.sendKeyEvent(keyDown)
-        val keyUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)
-        currentInputConnection?.sendKeyEvent(keyUp)
+        currentInputConnection?.apply {
+            sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL))
+            sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL))
+        }
     }
 
     private fun showMessage(msg: String) {

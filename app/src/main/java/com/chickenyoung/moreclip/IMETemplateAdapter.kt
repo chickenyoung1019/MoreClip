@@ -9,9 +9,6 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
-/**
- * IME用Adapter（フォルダ/定型文両対応）
- */
 class IMETemplateAdapter(
     private var items: List<TemplateItem>,
     private val onFolderClick: (String) -> Unit,
@@ -41,49 +38,33 @@ class IMETemplateAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return if (viewType == TYPE_FOLDER) {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_ime_folder, parent, false)
-            FolderViewHolder(view)
-        } else {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_ime_template, parent, false)
-            TemplateViewHolder(view)
+        val inflater = LayoutInflater.from(parent.context)
+        return when (viewType) {
+            TYPE_FOLDER -> FolderViewHolder(inflater.inflate(R.layout.item_ime_folder, parent, false))
+            else -> TemplateViewHolder(inflater.inflate(R.layout.item_ime_template, parent, false))
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val item = items[position]) {
-            is TemplateItem.Folder -> {
-                val h = holder as FolderViewHolder
-                h.textName.text = item.name
-                h.textCount.text = "${item.count}件"
-                h.itemView.setOnClickListener {
-                    onFolderClick(item.name)
-                }
-                h.itemView.setOnLongClickListener { view ->
-                    showPreview(view, item.name)
-                    true
-                }
-            }
-            is TemplateItem.Template -> {
-                val h = holder as TemplateViewHolder
-                h.textContent.text = item.memo.content.replace("\n", " ")
-                if (item.memo.folder != null) {
-                    h.textFolder.text = item.memo.folder
-                    h.textFolder.visibility = View.VISIBLE
-                } else {
-                    h.textFolder.visibility = View.GONE
-                }
-                h.itemView.setOnClickListener {
-                    onTemplateClick(item.memo)
-                }
-                h.itemView.setOnLongClickListener { view ->
-                    showPreview(view, item.memo.content)
-                    true
-                }
-            }
+            is TemplateItem.Folder -> (holder as FolderViewHolder).bind(item)
+            is TemplateItem.Template -> (holder as TemplateViewHolder).bind(item)
         }
+    }
+
+    private fun FolderViewHolder.bind(item: TemplateItem.Folder) {
+        textName.text = item.name
+        textCount.text = "${item.count}件"
+        itemView.setOnClickListener { onFolderClick(item.name) }
+        itemView.setOnLongClickListener { showPreview(it, item.name); true }
+    }
+
+    private fun TemplateViewHolder.bind(item: TemplateItem.Template) {
+        textContent.text = item.memo.content.replace("\n", " ")
+        textFolder.text = item.memo.folder
+        textFolder.visibility = if (item.memo.folder != null) View.VISIBLE else View.GONE
+        itemView.setOnClickListener { onTemplateClick(item.memo) }
+        itemView.setOnLongClickListener { showPreview(it, item.memo.content); true }
     }
 
     override fun getItemCount() = items.size
@@ -106,13 +87,11 @@ class IMETemplateAdapter(
     }
 
     fun updateData(newItems: List<TemplateItem>) {
-        val diffCallback = TemplateItemDiffCallback(items, newItems)
-        val diffResult = DiffUtil.calculateDiff(diffCallback)
+        val diffResult = DiffUtil.calculateDiff(TemplateItemDiffCallback(items, newItems))
         items = newItems
         diffResult.dispatchUpdatesTo(this)
     }
 
-    // DiffUtilコールバック
     private class TemplateItemDiffCallback(
         private val oldList: List<TemplateItem>,
         private val newList: List<TemplateItem>
