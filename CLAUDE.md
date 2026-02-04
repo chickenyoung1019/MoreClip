@@ -147,7 +147,7 @@ ClipboardTileService (クイックタイル)
 |-----------|------|---------|
 | `app_settings` | 履歴の設定 | `allow_duplicate`, `auto_close`, `move_to_top`, `max_lines` |
 | `template_settings` | 定型文の設定 | `allow_duplicate`, `auto_close`, `max_lines`, `folder_order` |
-| `ime_settings` | IMEの設定 | `ime_after_input_action` |
+| `ime_settings` | IMEの設定 | `ime_close_after_input`, `ime_switch_after_input` |
 
 ---
 

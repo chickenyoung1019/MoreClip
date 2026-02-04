@@ -209,6 +209,9 @@ class MainActivity : AppCompatActivity() {
         // バナー広告読み込み
         loadBannerAd()
 
+        // 初回起動ダイアログ
+        showFirstLaunchDialog()
+
         // 戻るボタンの処理
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -1129,6 +1132,39 @@ class MainActivity : AppCompatActivity() {
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
         bannerAdView = AdHelper.loadBannerAd(this, adContainer)
+    }
+
+    private fun showFirstLaunchDialog() {
+        val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
+        if (prefs.getBoolean("hide_first_launch_dialog", false)) return
+
+        val message = """
+            このアプリは専用キーボード（IME）を搭載しています。
+
+            IMEを有効化する際にAndroidから警告が表示されますが、このアプリは以下の点で安全です：
+
+            ・インターネット接続をしません
+            ・入力データを収集しません
+            ・外部にデータを送信しません
+
+            すべてのデータは端末内にのみ保存されます。
+        """.trimIndent()
+
+        val checkBox = android.widget.CheckBox(this).apply {
+            text = "今後表示しない"
+            setPadding(48, 32, 48, 0)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("IMEのご利用について")
+            .setMessage(message)
+            .setView(checkBox)
+            .setPositiveButton("OK") { _, _ ->
+                if (checkBox.isChecked) {
+                    prefs.edit().putBoolean("hide_first_launch_dialog", true).apply()
+                }
+            }
+            .show()
     }
 
     override fun onDestroy() {
