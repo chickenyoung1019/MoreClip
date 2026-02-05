@@ -2,6 +2,7 @@ package com.chickenyoung.moreclip
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.PopupMenu
@@ -208,9 +209,6 @@ class MainActivity : AppCompatActivity() {
 
         // バナー広告読み込み
         loadBannerAd()
-
-        // 初回起動ダイアログ
-        showFirstLaunchDialog()
 
         // 戻るボタンの処理
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -1132,6 +1130,15 @@ class MainActivity : AppCompatActivity() {
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
         bannerAdView = AdHelper.loadBannerAd(this, adContainer)
+    }
+
+    /**
+     * App Open Ad が閉じられた（または表示されなかった）時に呼ばれる
+     * MyApplication から呼び出される
+     */
+    fun onAppOpenAdDismissed() {
+        Log.d("MainActivity", "onAppOpenAdDismissed called")
+        showFirstLaunchDialog()
     }
 
     private fun showFirstLaunchDialog() {

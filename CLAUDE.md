@@ -173,6 +173,20 @@ ClipboardTileService (クイックタイル)
 | バナー広告 | `ca-app-pub-5377681981369299/6584173262` |
 | App Open広告 | `ca-app-pub-5377681981369299/6075663533` |
 
+### App Open Ad 実装ルール
+
+- **広告終了直後に`fetchAd()`を呼ばない** - Frequency capに引っかかる
+- **`init`で広告を読み込まない** - 必要な時（Activity表示時）に読み込む
+- **読み込み待機にはタイムアウトを設ける** - 現在5秒
+- 詳細は `docs/report_aoa_dialog_fix.md` 参照
+
+---
+
+## RecyclerView / DiffUtil
+
+- **設定変更後は`notifyDataSetChanged()`が必要** - DiffUtilは内容が同じなら再描画しない
+- Fragmentの`onResume()`でAdapterの`notifyDataSetChanged()`を呼ぶ
+
 ---
 
 ## 今後の拡張ポイント

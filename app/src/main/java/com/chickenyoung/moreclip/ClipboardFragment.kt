@@ -59,6 +59,8 @@ class ClipboardFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         loadMemos()
+        // 設定変更を反映するため強制再描画
+        adapter.notifyDataSetChanged()
     }
 
     fun loadMemos() {
