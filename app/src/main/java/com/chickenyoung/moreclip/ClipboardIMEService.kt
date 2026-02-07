@@ -45,6 +45,7 @@ class ClipboardIMEService : InputMethodService() {
     private var currentFolder: String? = null
     private var lastCommittedTextLength = 0
     private var isHistoryMode = false
+    private var expectingCursorUpdate = false
 
     private var cachedHistoryItems: List<TemplateItem> = emptyList()
     private var cachedTemplateItems: List<TemplateItem> = emptyList()
@@ -108,7 +109,23 @@ class ClipboardIMEService : InputMethodService() {
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        disableUndo()
         refreshCache()
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        if (expectingCursorUpdate) {
+            // commitText直後のカーソル移動は無視
+            expectingCursorUpdate = false
+        } else if (lastCommittedTextLength > 0) {
+            // ユーザーがカーソルを移動した → アンドゥ無効化
+            disableUndo()
+        }
     }
 
     private fun switchMode(historyMode: Boolean) {
@@ -188,6 +205,7 @@ class ClipboardIMEService : InputMethodService() {
 
     private fun commitTextAndHandleAfterAction(text: String) {
         lastCommittedTextLength = text.length
+        expectingCursorUpdate = true
         currentInputConnection?.commitText(text, 1)
         btnUndo?.setColorFilter(COLOR_ACTIVE)
 

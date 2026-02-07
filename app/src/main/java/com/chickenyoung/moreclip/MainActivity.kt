@@ -1,6 +1,7 @@
 package com.chickenyoung.moreclip
 
 import android.content.Intent
+import android.provider.Settings
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -44,9 +45,11 @@ class MainActivity : AppCompatActivity() {
 
     // 広告関連
     private var bannerAdView: AdView? = null
+    private var isColdStart = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        isColdStart = savedInstanceState == null
         setContentView(R.layout.activity_main)
 
         // ステータスバーの文字色を黒にする
@@ -1137,8 +1140,11 @@ class MainActivity : AppCompatActivity() {
      * MyApplication から呼び出される
      */
     fun onAppOpenAdDismissed() {
-        Log.d("MainActivity", "onAppOpenAdDismissed called")
-        showFirstLaunchDialog()
+        Log.d("MainActivity", "onAppOpenAdDismissed called, isColdStart: $isColdStart")
+        if (isColdStart) {
+            isColdStart = false
+            showFirstLaunchDialog()
+        }
     }
 
     private fun showFirstLaunchDialog() {
@@ -1146,30 +1152,44 @@ class MainActivity : AppCompatActivity() {
         if (prefs.getBoolean("hide_first_launch_dialog", false)) return
 
         val message = """
-            このアプリは専用キーボード（IME）を搭載しています。
+            
+            ・履歴や定型文を直接入力できる専用キーボードがご利用できます。
+            
+            ・ご利用にはキーボードの初回有効化が必要です。
 
-            IMEを有効化する際にAndroidから警告が表示されますが、このアプリは以下の点で安全です：
+            ※このアプリはデータの収集・送信を一切行いませんのでご安心ください。
 
-            ・インターネット接続をしません
-            ・入力データを収集しません
-            ・外部にデータを送信しません
 
-            すべてのデータは端末内にのみ保存されます。
+            設定を有効化しますか？
+            
         """.trimIndent()
 
         val checkBox = android.widget.CheckBox(this).apply {
             text = "今後表示しない"
-            setPadding(48, 32, 48, 0)
+        }
+        val checkBoxContainer = android.widget.FrameLayout(this).apply {
+            setPadding(48, 50, 48, 50)
+            addView(checkBox)
+        }
+
+        val title = android.text.SpannableString("●専用キーボードについて").apply {
+            setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, length, 0)
         }
 
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("IMEのご利用について")
+            .setTitle(title)
             .setMessage(message)
-            .setView(checkBox)
-            .setPositiveButton("OK") { _, _ ->
+            .setView(checkBoxContainer)
+            .setNegativeButton("今は設定しない") { _, _ ->
                 if (checkBox.isChecked) {
                     prefs.edit().putBoolean("hide_first_launch_dialog", true).apply()
                 }
+            }
+            .setPositiveButton("設定画面に移動") { _, _ ->
+                if (checkBox.isChecked) {
+                    prefs.edit().putBoolean("hide_first_launch_dialog", true).apply()
+                }
+                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
             }
             .show()
     }
