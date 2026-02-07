@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
 class TemplateAdapter(
@@ -290,10 +289,8 @@ class TemplateAdapter(
     fun isAllSelected(): Boolean = selectedItems.size == items.size && items.isNotEmpty()
 
     fun updateData(newItems: List<TemplateItem>) {
-        val diffCallback = TemplateItemDiffCallback(items, newItems)
-        val diffResult = DiffUtil.calculateDiff(diffCallback)
         items = newItems
-        diffResult.dispatchUpdatesTo(this)
+        notifyDataSetChanged()
     }
 
     // 並び替えモード
@@ -317,34 +314,4 @@ class TemplateAdapter(
 
     fun getCurrentList(): List<TemplateItem> = items
 
-    // DiffUtilコールバック
-    private class TemplateItemDiffCallback(
-        private val oldList: List<TemplateItem>,
-        private val newList: List<TemplateItem>
-    ) : DiffUtil.Callback() {
-        override fun getOldListSize() = oldList.size
-        override fun getNewListSize() = newList.size
-
-        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            val old = oldList[oldItemPosition]
-            val new = newList[newItemPosition]
-            return when {
-                old is TemplateItem.Folder && new is TemplateItem.Folder -> old.name == new.name
-                old is TemplateItem.Template && new is TemplateItem.Template -> old.memo.id == new.memo.id
-                else -> false
-            }
-        }
-
-        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-            val old = oldList[oldItemPosition]
-            val new = newList[newItemPosition]
-            return when {
-                old is TemplateItem.Folder && new is TemplateItem.Folder ->
-                    old.name == new.name && old.count == new.count
-                old is TemplateItem.Template && new is TemplateItem.Template ->
-                    old.memo.content == new.memo.content
-                else -> false
-            }
-        }
-    }
 }

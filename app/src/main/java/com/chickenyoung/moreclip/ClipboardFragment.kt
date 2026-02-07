@@ -105,8 +105,8 @@ class ClipboardFragment : Fragment() {
 
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            val allMemos = db.memoDao().getAllMemos()
-            val copiedMemo = allMemos.find { it.content == text }
+            val historyMemos = db.memoDao().getHistoryMemos()
+            val copiedMemo = historyMemos.find { it.content == text }
 
             copiedMemo?.let {
                 if (prefs.getBoolean("move_to_top", false)) {

@@ -34,6 +34,9 @@
 - 「使われていなさそう」という推測だけでコードを削除
 - 複数の変更を1コミットにまとめてリファクタ（問題発生時に切り分けが困難）
 
+### 過去のバグ事例
+- `getAllMemos()`で履歴を検索した際、定型文が先にヒットして誤動作した。**履歴の操作には`getHistoryMemos()`を使うこと**。テーブルが共通（memos）なので、isTemplateフィルタの意識が必要。
+
 ## 開発サイクル（PDCA）
 
 ### 目的
@@ -142,6 +145,9 @@ ProcessTextActivity (共有・PROCESS_TEXT受信)
 ClipboardTileService (クイックタイル)
 ```
 
+### クイックタイルの制約
+- コールドスタート時、TileServiceバインドまで1〜2秒「使用不可」が表示される（システム制約、修正不可）
+
 ---
 
 ## データベース
@@ -182,10 +188,37 @@ ClipboardTileService (クイックタイル)
 
 ---
 
-## RecyclerView / DiffUtil
+## RecyclerView
 
-- **設定変更後は`notifyDataSetChanged()`が必要** - DiffUtilは内容が同じなら再描画しない
-- Fragmentの`onResume()`でAdapterの`notifyDataSetChanged()`を呼ぶ
+- DiffUtilは不使用（全アダプターで`notifyDataSetChanged()`を使用）
+- 設定変更後はFragmentの`onResume()`で`adapter.notifyDataSetChanged()`を呼ぶ
+
+---
+
+## Play Console リリース対応
+
+### プライバシーポリシー
+- GitHub上の `privacy-policy.md` がPlay Consoleに登録済み
+- IME搭載の場合：キーストローク非収集を明記必須
+- AdMob使用時：SDK経由のデータ収集を正直に記載（「外部送信なし」と矛盾しないよう注意）
+
+### データセーフティ
+- AdMob使用時は「データ収集あり」で申告必須
+- 申告データ：おおよその位置情報、デバイスID、アプリのインタラクション、診断情報
+
+---
+
+## リリースフロー
+
+### ブランチ運用と製品版リリース
+1. `feature/xxx` で開発・ビルド
+2. クローズドテストに提出して動作確認
+3. 問題なければ `feature/xxx` を `main` にマージ（プライバシーポリシーURL反映のため）
+4. Play Console「リリースを昇格」でクローズドテストのビルドを製品版に昇格（再ビルド不要）
+
+### 注意
+- プライバシーポリシー（GitHub上）は `main` ブランチを参照 → マージは製品版昇格前に行う
+- クローズドテストで問題が見つかった場合のみ、修正→再ビルド→再提出
 
 ---
 
