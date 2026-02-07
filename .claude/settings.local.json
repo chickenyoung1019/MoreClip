@@ -5,7 +5,9 @@
       "Bash(git commit:*)",
       "Bash(./gradlew bundleRelease:*)",
       "Bash(git remote:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(git push)",
+      "Bash(./gradlew assembleDebug:*)"
     ]
   }
 }

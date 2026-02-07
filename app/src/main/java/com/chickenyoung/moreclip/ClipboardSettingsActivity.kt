@@ -9,8 +9,7 @@ import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.ads.AdView
 
 class ClipboardSettingsActivity : AppCompatActivity() {
@@ -29,7 +28,7 @@ class ClipboardSettingsActivity : AppCompatActivity() {
         loadBannerAd()
 
         // ステータスバーの文字色を黒にする
-        window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
 
         // ツールバー設定
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
@@ -87,26 +86,11 @@ class ClipboardSettingsActivity : AppCompatActivity() {
     // バナー広告を読み込む
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
-
-        bannerAdView = AdView(this).apply {
-            adUnitId = "ca-app-pub-5377681981369299/6584173262"
-            setAdSize(getAdaptiveBannerAdSize())
-        }
-
-        adContainer.removeAllViews()
-        adContainer.addView(bannerAdView)
-
-        val adRequest = AdRequest.Builder().build()
-        bannerAdView?.loadAd(adRequest)
+        bannerAdView = AdHelper.loadBannerAd(this, adContainer)
     }
 
-    // アダプティブバナーのサイズを取得
-    private fun getAdaptiveBannerAdSize(): AdSize {
-        val displayMetrics = resources.displayMetrics
-        val adWidthPixels = displayMetrics.widthPixels.toFloat()
-        val density = displayMetrics.density
-        val adWidth = (adWidthPixels / density).toInt()
-
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+    override fun onDestroy() {
+        bannerAdView?.destroy()
+        super.onDestroy()
     }
 }

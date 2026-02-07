@@ -59,6 +59,8 @@ class ClipboardFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         loadMemos()
+        // 設定変更を反映するため強制再描画
+        adapter.notifyDataSetChanged()
     }
 
     fun loadMemos() {
@@ -103,21 +105,13 @@ class ClipboardFragment : Fragment() {
 
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            val allMemos = db.memoDao().getAllMemos()
-            val copiedMemo = allMemos.find { it.content == text }
+            val historyMemos = db.memoDao().getHistoryMemos()
+            val copiedMemo = historyMemos.find { it.content == text }
 
             copiedMemo?.let {
                 if (prefs.getBoolean("move_to_top", false)) {
-                    // 履歴メモのみ取得
-                    val historyMemos = db.memoDao().getHistoryMemos()
-
-                    // 他の履歴のdisplayOrderを1増やす
-                    historyMemos.forEach { memo ->
-                        if (memo.id != it.id) {
-                            val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                            db.memoDao().update(updated)
-                        }
-                    }
+                    // 他の履歴のdisplayOrderを1増やす（1クエリで一括更新）
+                    db.memoDao().incrementHistoryDisplayOrderExcept(it.id)
 
                     // コピーしたメモを最新（displayOrder=0）に設定
                     val updated = it.copy(
@@ -192,9 +186,8 @@ class ClipboardFragment : Fragment() {
                     val allMemos = db.memoDao().getAllMemos()
                     val memosToDelete = allMemos.filter { selectedIds.contains(it.id) }
 
-                    memosToDelete.forEach { memo ->
-                        db.memoDao().delete(memo)
-                    }
+                    // バッチ削除（1クエリで実行）
+                    db.memoDao().deleteAll(memosToDelete)
 
                     adapter.exitSelectMode()
                     loadMemos()

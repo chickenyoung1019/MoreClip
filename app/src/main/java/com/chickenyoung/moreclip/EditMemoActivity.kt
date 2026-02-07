@@ -67,6 +67,26 @@ class EditMemoActivity : AppCompatActivity() {
             val memo = db.memoDao().getAllMemos().find { it.id == memoId }
 
             if (memo != null) {
+                // 重複チェック（内容が変わった場合のみ）
+                if (newContent != memo.content) {
+                    val prefsKey = if (memo.isTemplate) "template_settings" else "app_settings"
+                    val prefs = getSharedPreferences(prefsKey, MODE_PRIVATE)
+                    val allowDuplicate = prefs.getBoolean("allow_duplicate", false)
+
+                    if (!allowDuplicate) {
+                        val allMemos = db.memoDao().getAllMemos()
+                        val isDuplicate = if (memo.isTemplate) {
+                            allMemos.any { it.isTemplate && it.id != memoId && it.content == newContent && it.folder == memo.folder }
+                        } else {
+                            allMemos.any { !it.isTemplate && it.id != memoId && it.content == newContent }
+                        }
+                        if (isDuplicate) {
+                            Toast.makeText(this@EditMemoActivity, "同じ内容が既に存在します", Toast.LENGTH_SHORT).show()
+                            return@launch
+                        }
+                    }
+                }
+
                 val updatedMemo = memo.copy(content = newContent)
                 db.memoDao().update(updatedMemo)
                 Toast.makeText(this@EditMemoActivity, "更新しました", Toast.LENGTH_SHORT).show()

@@ -134,35 +134,38 @@ class ClipboardAdapter(
         // 全て未選択になったら選択モード解除
         if (selectedItems.isEmpty()) {
             exitSelectMode()
+        } else {
+            // 選択状態が変わったアイテムのみ更新
+            val position = memos.indexOfFirst { it.id == memoId }
+            if (position >= 0) {
+                notifyItemChanged(position)
+            }
         }
-
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
     fun enterSelectMode() {
         isSelectMode = true
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun exitSelectMode() {
         isSelectMode = false
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun selectAll() {
         selectedItems.clear()
         selectedItems.addAll(memos.map { it.id })
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
         onSelectionChanged(selectedItems)
     }
 
     fun deselectAll() {
         selectedItems.clear()
         exitSelectMode()
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
@@ -178,12 +181,12 @@ class ClipboardAdapter(
     // 並び替えモード
     fun enterReorderMode() {
         isReorderMode = true
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun exitReorderMode() {
         isReorderMode = false
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, memos.size)
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {

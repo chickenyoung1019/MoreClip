@@ -1,35 +1,59 @@
 package com.chickenyoung.moreclip
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
+import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
+import android.widget.Switch
+import android.os.Handler
+import android.os.Looper
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * 貼り付け専用IME
- */
 class ClipboardIMEService : InputMethodService() {
 
+    companion object {
+        private const val COLOR_ACTIVE = 0xFF1976D2.toInt()
+        private const val COLOR_DISABLED = 0xFF888888.toInt()
+    }
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val handler = Handler(Looper.getMainLooper())
+
     private var adapter: IMETemplateAdapter? = null
     private var recyclerView: RecyclerView? = null
     private var emptyText: TextView? = null
     private var btnBack: ImageView? = null
-    private var tabTemplate: TextView? = null
-    private var tabHistory: TextView? = null
+    private var tabTemplate: ImageView? = null
+    private var tabHistory: ImageView? = null
+    private var switchClose: Switch? = null
+    private var switchChange: Switch? = null
+    private var toastMessage: TextView? = null
+    private var btnUndo: ImageView? = null
 
     private var currentFolder: String? = null
+    private var lastCommittedTextLength = 0
     private var isHistoryMode = false
+    private var expectingCursorUpdate = false
+
+    private var cachedHistoryItems: List<TemplateItem> = emptyList()
+    private var cachedTemplateItems: List<TemplateItem> = emptyList()
+    private var cachedFolderContents: MutableMap<String, List<TemplateItem>> = mutableMapOf()
 
     override fun onCreateInputView(): View {
+        window?.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#F5F5F5")))
+
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
 
         recyclerView = view.findViewById(R.id.recyclerView)
@@ -40,149 +64,211 @@ class ClipboardIMEService : InputMethodService() {
 
         adapter = IMETemplateAdapter(
             emptyList(),
-            onFolderClick = { folderName -> openFolder(folderName) },
-            onTemplateClick = { memo -> commitTextAndHandleAfterAction(memo.content) }
+            onFolderClick = { setFolder(it) },
+            onTemplateClick = { commitTextAndHandleAfterAction(it.content) }
         )
         recyclerView?.layoutManager = LinearLayoutManager(this)
+        recyclerView?.itemAnimator = null
         recyclerView?.adapter = adapter
 
-        btnBack?.setOnClickListener { exitFolder() }
+        btnBack?.setOnClickListener { setFolder(null) }
+        tabTemplate?.setOnClickListener { switchMode(historyMode = false) }
+        tabHistory?.setOnClickListener { switchMode(historyMode = true) }
+        view.findViewById<ImageView>(R.id.btnSwitchKeyboard)?.setOnClickListener { switchToPreviousInputMethod() }
 
-        tabTemplate?.setOnClickListener { switchToTemplate() }
-        tabHistory?.setOnClickListener { switchToHistory() }
+        setupBackspaceButton(view.findViewById(R.id.btnBackspace))
 
-        view.findViewById<ImageView>(R.id.btnSwitchKeyboard)?.setOnClickListener {
-            switchToPreviousInputMethod()
+        btnUndo = view.findViewById<ImageView>(R.id.btnUndo)?.apply {
+            setColorFilter(COLOR_DISABLED)
+            setOnClickListener { undoLastCommit() }
         }
 
-        view.findViewById<ImageView>(R.id.btnBackspace)?.setOnClickListener {
-            // バックスペースキーイベントを送信（選択テキストも削除可能）
-            val keyEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)
-            currentInputConnection?.sendKeyEvent(keyEvent)
-            val keyEventUp = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)
-            currentInputConnection?.sendKeyEvent(keyEventUp)
+        val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
+        switchClose = view.findViewById(R.id.switchClose)
+        switchChange = view.findViewById(R.id.switchChange)
+        toastMessage = view.findViewById(R.id.toastMessage)
+
+        switchClose?.isChecked = prefs.getBoolean("ime_close_after_input", false)
+        switchChange?.isChecked = prefs.getBoolean("ime_switch_after_input", true)
+
+        switchClose?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("ime_close_after_input", isChecked).apply()
+            showMessage(if (isChecked) "入力後にキーボードを閉じます" else "入力後もキーボードを表示します")
         }
 
-        loadData()
+        switchChange?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("ime_switch_after_input", isChecked).apply()
+            showMessage(if (isChecked) "入力後に前のキーボードに切り替えます" else "入力後もこのキーボードのままです")
+        }
+
+        updateTabUI()
+        refreshCache()
 
         return view
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        loadData()
+        disableUndo()
+        refreshCache()
     }
 
-    private fun switchToTemplate() {
-        isHistoryMode = false
-        currentFolder = null
-        updateTabUI()
-        loadData()
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        if (expectingCursorUpdate) {
+            // commitText直後のカーソル移動は無視
+            expectingCursorUpdate = false
+        } else if (lastCommittedTextLength > 0) {
+            // ユーザーがカーソルを移動した → アンドゥ無効化
+            disableUndo()
+        }
     }
 
-    private fun switchToHistory() {
-        isHistoryMode = true
+    private fun switchMode(historyMode: Boolean) {
+        isHistoryMode = historyMode
         currentFolder = null
         btnBack?.visibility = View.INVISIBLE
+        disableUndo()
         updateTabUI()
-        loadData()
+        showCachedData()
     }
 
     private fun updateTabUI() {
-        if (isHistoryMode) {
-            tabTemplate?.setTextColor(0xFF888888.toInt())
-            tabTemplate?.setTypeface(null, android.graphics.Typeface.NORMAL)
-            tabHistory?.setTextColor(0xFF1976D2.toInt())
-            tabHistory?.setTypeface(null, android.graphics.Typeface.BOLD)
+        val (templateColor, historyColor) = if (isHistoryMode) {
+            COLOR_DISABLED to COLOR_ACTIVE
         } else {
-            tabTemplate?.setTextColor(0xFF1976D2.toInt())
-            tabTemplate?.setTypeface(null, android.graphics.Typeface.BOLD)
-            tabHistory?.setTextColor(0xFF888888.toInt())
-            tabHistory?.setTypeface(null, android.graphics.Typeface.NORMAL)
+            COLOR_ACTIVE to COLOR_DISABLED
         }
+        tabTemplate?.setColorFilter(templateColor)
+        tabHistory?.setColorFilter(historyColor)
     }
 
-    private fun openFolder(folderName: String) {
+    private fun setFolder(folderName: String?) {
         currentFolder = folderName
-        btnBack?.visibility = View.VISIBLE
-        loadData()
+        btnBack?.visibility = if (folderName != null) View.VISIBLE else View.INVISIBLE
+        disableUndo()
+        showCachedData()
     }
 
-    private fun exitFolder() {
-        currentFolder = null
-        btnBack?.visibility = View.INVISIBLE
-        loadData()
-    }
-
-    private fun loadData() {
+    private fun refreshCache() {
         serviceScope.launch {
-            val items = withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 val db = AppDatabase.getDatabase(applicationContext)
 
-                if (isHistoryMode) {
-                    // 履歴モード
-                    val history = db.memoDao().getHistoryMemos()
-                        .sortedByDescending { it.createdAt }
-                    history.map { TemplateItem.Template(it) }
-                } else if (currentFolder == null) {
-                    // 定型文モード（フォルダ一覧）
-                    val templateItems = mutableListOf<TemplateItem>()
-                    val folders = db.memoDao().getFolders()
-                    for (folderName in folders) {
-                        val count = db.memoDao().getTemplatesByFolder(folderName).size
-                        templateItems.add(TemplateItem.Folder(folderName, count))
-                    }
-                    val templates = db.memoDao().getTemplatesWithoutFolder()
-                        .sortedBy { it.displayOrder }
-                    for (memo in templates) {
-                        templateItems.add(TemplateItem.Template(memo))
-                    }
-                    templateItems
-                } else {
-                    // フォルダ内
-                    val templates = db.memoDao().getTemplatesByFolder(currentFolder!!)
-                        .sortedBy { it.displayOrder }
-                    templates.map { TemplateItem.Template(it) }
-                }
-            }
+                // 履歴キャッシュ
+                cachedHistoryItems = db.memoDao().getHistoryMemos()
+                    .sortedByDescending { it.createdAt }
+                    .map { TemplateItem.Template(it) }
 
-            if (items.isEmpty()) {
-                recyclerView?.visibility = View.INVISIBLE
-                emptyText?.visibility = View.VISIBLE
-                emptyText?.text = if (isHistoryMode) "履歴がありません" else "定型文がありません"
-            } else {
-                recyclerView?.visibility = View.VISIBLE
-                emptyText?.visibility = View.INVISIBLE
-                adapter?.updateData(items)
+                // 定型文キャッシュ（フォルダ一覧）
+                val templateItems = mutableListOf<TemplateItem>()
+                val folders = db.memoDao().getFolders()
+                cachedFolderContents.clear()
+                for (folderName in folders) {
+                    val folderTemplates = db.memoDao().getTemplatesByFolder(folderName)
+                        .sortedBy { it.displayOrder }
+                    templateItems.add(TemplateItem.Folder(folderName, folderTemplates.size))
+                    cachedFolderContents[folderName] = folderTemplates.map { TemplateItem.Template(it) }
+                }
+                val templates = db.memoDao().getTemplatesWithoutFolder()
+                    .sortedBy { it.displayOrder }
+                for (memo in templates) {
+                    templateItems.add(TemplateItem.Template(memo))
+                }
+                cachedTemplateItems = templateItems
+            }
+            showCachedData()
+        }
+    }
+
+    private fun showCachedData() {
+        val items = when {
+            isHistoryMode -> cachedHistoryItems
+            currentFolder != null -> cachedFolderContents[currentFolder] ?: emptyList()
+            else -> cachedTemplateItems
+        }
+
+        if (items.isEmpty()) {
+            recyclerView?.visibility = View.INVISIBLE
+            emptyText?.visibility = View.VISIBLE
+            emptyText?.text = if (isHistoryMode) "履歴がありません" else "定型文がありません"
+        } else {
+            recyclerView?.visibility = View.VISIBLE
+            emptyText?.visibility = View.INVISIBLE
+            adapter?.updateData(items)
+        }
+    }
+
+    private fun commitTextAndHandleAfterAction(text: String) {
+        lastCommittedTextLength = text.length
+        expectingCursorUpdate = true
+        currentInputConnection?.commitText(text, 1)
+        btnUndo?.setColorFilter(COLOR_ACTIVE)
+
+        if (switchClose?.isChecked == true) requestHideSelf(0)
+        if (switchChange?.isChecked != false) switchToPreviousInputMethod()
+    }
+
+    private fun undoLastCommit() {
+        if (lastCommittedTextLength <= 0) return
+        currentInputConnection?.deleteSurroundingText(lastCommittedTextLength, 0)
+        disableUndo()
+    }
+
+    private fun disableUndo() {
+        lastCommittedTextLength = 0
+        btnUndo?.setColorFilter(COLOR_DISABLED)
+    }
+
+    private val backspaceRunnable = object : Runnable {
+        override fun run() {
+            sendBackspaceKey()
+            handler.postDelayed(this, 50)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupBackspaceButton(btn: ImageView?) {
+        btn?.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    sendBackspaceKey()
+                    handler.postDelayed(backspaceRunnable, 400)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(backspaceRunnable)
+                    true
+                }
+                else -> false
             }
         }
     }
 
-    /**
-     * テキストを入力し、設定に応じた後処理を実行
-     * 設定値: "switch" = 前のキーボードに切り替え, "close" = 閉じる, "stay" = そのまま
-     */
-    private fun commitTextAndHandleAfterAction(text: String) {
-        // テキストを入力
-        currentInputConnection?.commitText(text, 1)
-
-        // 設定を読み取り
-        val prefs = getSharedPreferences("ime_settings", Context.MODE_PRIVATE)
-        val action = prefs.getString("ime_after_input_action", "switch") ?: "switch"
-
-        when (action) {
-            "switch" -> {
-                // キーボードを閉じてから直前のキーボードに切り替え
-                requestHideSelf(0)
-                switchToPreviousInputMethod()
-            }
-            "close" -> {
-                // キーボードを閉じる（IMEは変わらない）
-                requestHideSelf(0)
-            }
-            "stay" -> {
-                // 何もしない（そのまま）
-            }
+    private fun sendBackspaceKey() {
+        disableUndo()
+        currentInputConnection?.apply {
+            sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL))
+            sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL))
         }
+    }
+
+    private fun showMessage(msg: String) {
+        handler.removeCallbacksAndMessages(null)
+        toastMessage?.text = msg
+        toastMessage?.visibility = View.VISIBLE
+        handler.postDelayed({
+            toastMessage?.visibility = View.GONE
+        }, 2000)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
+        serviceScope.cancel()
     }
 }

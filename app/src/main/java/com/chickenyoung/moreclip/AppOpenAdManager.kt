@@ -2,36 +2,38 @@ package com.chickenyoung.moreclip
 
 import android.app.Activity
 import android.app.Application
-import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.appopen.AppOpenAd
+import java.lang.ref.WeakReference
 import java.util.Date
 
-class AppOpenAdManager(private val application: Application) : Application.ActivityLifecycleCallbacks {
+class AppOpenAdManager(private val application: Application) {
 
     private var appOpenAd: AppOpenAd? = null
-    private var currentActivity: Activity? = null
     private var isShowingAd = false
+    private var isLoadingAd = false  // 読み込み中フラグ
     private var loadTime: Long = 0
-    private var isFirstLoad = true // 初回読み込みフラグ
 
-    init {
-        application.registerActivityLifecycleCallbacks(this)
-        fetchAd()
-    }
+    // 広告読み込み完了後に表示を待っているActivity（WeakReferenceでメモリリーク防止）
+    private var pendingActivity: WeakReference<Activity>? = null
 
-    // 広告を読み込む
+    // 広告が閉じられた時のコールバック
+    private var onAdDismissedCallback: (() -> Unit)? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+
     private fun fetchAd() {
-        if (isAdAvailable()) {
-            return
-        }
+        if (isAdAvailable() || isLoadingAd) return
 
+        isLoadingAd = true
         val adRequest = AdRequest.Builder().build()
-        val adUnitId = "ca-app-pub-5377681981369299/6075663533" // App Open Ads 本番ID
+        val adUnitId = "ca-app-pub-5377681981369299/6075663533"
 
         AppOpenAd.load(
             application,
@@ -41,76 +43,117 @@ class AppOpenAdManager(private val application: Application) : Application.Activ
                 override fun onAdLoaded(ad: AppOpenAd) {
                     appOpenAd = ad
                     loadTime = Date().time
+                    isLoadingAd = false
                     Log.d("AppOpenAd", "広告読み込み成功")
 
-                    // 初回読み込み時のみ自動表示
-                    if (isFirstLoad) {
-                        isFirstLoad = false
-                        showAdIfAvailable()
+                    // 待機中のActivityがあれば広告を表示
+                    pendingActivity?.get()?.let { activity ->
+                        showAdIfAvailable(activity)
                     }
+                    pendingActivity = null
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     appOpenAd = null
-                    isFirstLoad = false
+                    isLoadingAd = false
                     Log.e("AppOpenAd", "広告読み込み失敗: ${error.message}")
+
+                    // 読み込み失敗時はコールバック実行（ダイアログ表示のため）
+                    if (pendingActivity?.get() != null) {
+                        invokeAndClearCallback()
+                    }
+                    pendingActivity = null
                 }
             }
         )
     }
 
-    // 広告が利用可能かチェック
     private fun isAdAvailable(): Boolean {
-        // 広告が4時間以上前に読み込まれた場合は無効
         val wasLoadTimeLessThanNHoursAgo = Date().time - loadTime < 3600000 * 4
         return appOpenAd != null && wasLoadTimeLessThanNHoursAgo
     }
 
-    // 広告を表示
-    fun showAdIfAvailable() {
+    /**
+     * 広告を表示
+     * @param activity 広告を表示するActivity
+     * @param onDismissed 広告が閉じられた時のコールバック
+     */
+    fun showAdIfAvailable(
+        activity: Activity,
+        onDismissed: (() -> Unit)? = null
+    ) {
+        // コールバックを保存
+        if (onDismissed != null) {
+            onAdDismissedCallback = onDismissed
+        }
+
         if (!isShowingAd && isAdAvailable()) {
-            currentActivity?.let { activity ->
-                appOpenAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
-                    override fun onAdDismissedFullScreenContent() {
-                        appOpenAd = null
-                        isShowingAd = false
-                        fetchAd() // 次の広告を読み込む
-                        Log.d("AppOpenAd", "広告を閉じた")
-                    }
-
-                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                        appOpenAd = null
-                        isShowingAd = false
-                        fetchAd()
-                        Log.e("AppOpenAd", "広告表示失敗: ${error.message}")
-                    }
-
-                    override fun onAdShowedFullScreenContent() {
-                        isShowingAd = true
-                        Log.d("AppOpenAd", "広告を表示")
-                    }
+            appOpenAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    Log.d("AppOpenAd", "広告を閉じた")
+                    clearAdAndInvokeCallback()
                 }
 
-                appOpenAd?.show(activity)
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    Log.e("AppOpenAd", "広告表示失敗: ${error.message}")
+                    clearAdAndInvokeCallback()
+                }
+
+                override fun onAdShowedFullScreenContent() {
+                    isShowingAd = true
+                    Log.d("AppOpenAd", "広告を表示")
+                }
             }
+
+            appOpenAd?.show(activity)
+        } else if (appOpenAd == null) {
+            // 広告がなければ読み込みを開始（または読み込み中なら待機のみ）
+            if (!isLoadingAd) {
+                Log.d("AppOpenAd", "広告読み込み開始 - 完了を待機")
+                fetchAd()
+            } else {
+                Log.d("AppOpenAd", "広告読み込み中 - 完了を待機")
+            }
+            pendingActivity = WeakReference(activity)
+            startTimeoutForPendingActivity(activity)
         } else {
-            Log.d("AppOpenAd", "広告が利用不可")
-            fetchAd()
+            // 広告が期限切れ（4時間経過）
+            Log.d("AppOpenAd", "広告が利用不可（期限切れ）")
+            invokeAndClearCallback()
         }
     }
 
-    // ActivityLifecycleCallbacks
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-    override fun onActivityStarted(activity: Activity) {
-        currentActivity = activity
+    /** タイムアウト処理（5秒） */
+    private fun startTimeoutForPendingActivity(activity: Activity) {
+        handler.postDelayed({
+            if (pendingActivity?.get() == activity) {
+                Log.d("AppOpenAd", "広告読み込みタイムアウト")
+                pendingActivity = null
+                invokeAndClearCallback()
+            }
+        }, 5000)
     }
-    override fun onActivityResumed(activity: Activity) {}
-    override fun onActivityPaused(activity: Activity) {}
-    override fun onActivityStopped(activity: Activity) {}
-    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-    override fun onActivityDestroyed(activity: Activity) {
-        if (currentActivity == activity) {
-            currentActivity = null
+
+    /** 広告終了時の共通処理（広告クリア + コールバック実行） */
+    private fun clearAdAndInvokeCallback() {
+        appOpenAd = null
+        isShowingAd = false
+        // fetchAd() は呼ばない（Frequency cap対策）
+        invokeAndClearCallback()
+    }
+
+    /** コールバック実行とクリア */
+    private fun invokeAndClearCallback() {
+        onAdDismissedCallback?.invoke()
+        onAdDismissedCallback = null
+    }
+
+    /**
+     * Activity破棄時にpendingActivityをクリア（メモリリーク対策）
+     */
+    fun clearPendingActivityIfMatch(activity: Activity) {
+        if (pendingActivity?.get() == activity) {
+            pendingActivity = null
         }
     }
 }

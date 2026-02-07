@@ -1,11 +1,15 @@
 package com.chickenyoung.moreclip
 
 import android.content.Intent
+import android.provider.Settings
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.PopupMenu
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.viewpager2.widget.ViewPager2
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -41,13 +45,15 @@ class MainActivity : AppCompatActivity() {
 
     // 広告関連
     private var bannerAdView: AdView? = null
+    private var isColdStart = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        isColdStart = savedInstanceState == null
         setContentView(R.layout.activity_main)
 
         // ステータスバーの文字色を黒にする
-        window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
 
         tabLayout = findViewById(R.id.tabLayout)
         viewPager = findViewById(R.id.viewPager)
@@ -206,6 +212,27 @@ class MainActivity : AppCompatActivity() {
 
         // バナー広告読み込み
         loadBannerAd()
+
+        // 戻るボタンの処理
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                when {
+                    // 並び替えモード中ならキャンセル
+                    isReorderMode -> exitReorderMode(save = false)
+                    // 選択モード中なら解除
+                    isSelectMode -> exitSelectMode()
+                    // 検索モード中なら検索解除
+                    isSearchMode -> hideSearchBar()
+                    // フォルダモード中なら戻る
+                    backButton.visibility == View.VISIBLE -> onBackButtonClicked()
+                    // それ以外はアプリ終了
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        })
     }
 
     private fun initializeDisplayOrder() {
@@ -235,34 +262,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    override fun onBackPressed() {
-        // 並び替えモード中ならキャンセル
-        if (isReorderMode) {
-            exitReorderMode(save = false)
-            return
-        }
-
-        // 選択モード中なら解除
-        if (isSelectMode) {
-            exitSelectMode()
-            return
-        }
-
-        // 検索モード中なら検索解除
-        if (isSearchMode) {
-            hideSearchBar()
-            return
-        }
-
-        // フォルダモード中なら戻る
-        if (backButton.visibility == View.VISIBLE) {
-            onBackButtonClicked()
-            return
-        }
-
-        super.onBackPressed()
     }
 
     private fun showHeaderMenu(view: View) {
@@ -315,6 +314,7 @@ class MainActivity : AppCompatActivity() {
                     moveItem?.isEnabled = true
                 } else {
                     // フォルダ一覧：フォルダが含まれている場合は無効化（グレーアウト）
+                    @Suppress("UNCHECKED_CAST")
                     val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } ?: false
                     moveItem?.isEnabled = !hasFolder
                 }
@@ -377,135 +377,62 @@ class MainActivity : AppCompatActivity() {
 
 
     fun showAddTemplateDialog() {
-        val editText = android.widget.EditText(this).apply {
-            hint = "定型文を入力"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "定型文を追加",
+            hint = "定型文を入力",
+            positiveButtonText = "次へ"
+        ) { text ->
+            showFolderSelectionDialog(text)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("定型文を追加")
-            .setView(editText)
-            .setPositiveButton("次へ") { _, _ ->
-                val text = editText.text.toString().trim()
-                if (text.isNotEmpty()) {
-                    showFolderSelectionDialog(text)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun showCreateFolderDialog() {
-        val editText = android.widget.EditText(this).apply {
-            hint = "フォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "フォルダ名",
+            positiveButtonText = "次へ"
+        ) { folderName ->
+            showAddTemplateToFolderDialog(folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("次へ") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    showAddTemplateToFolderDialog(folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun showAddTemplateToFolderDialog(folderName: String) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "定型文を入力"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "「$folderName」に定型文を追加",
+            hint = "定型文を入力",
+            positiveButtonText = "追加"
+        ) { text ->
+            addTemplateWithFolder(text, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("「$folderName」に定型文を追加")
-            .setView(editText)
-            .setPositiveButton("追加") { _, _ ->
-                val text = editText.text.toString().trim()
-                if (text.isNotEmpty()) {
-                    addTemplateWithFolder(text, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun showFolderSelectionDialog(templateText: String) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
-            val folders = db.memoDao().getFolders().toMutableList()
-            folders.add(0, "新しいフォルダを作成")
-            folders.add("フォルダを選択しない")
+            val folders = db.memoDao().getFolders()
 
-            val folderArray = folders.toTypedArray()
-
-            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                .setTitle("フォルダを選択")
-                .setItems(folderArray) { _, which ->
-                    when {
-                        which == 0 -> {
-                            // 新しいフォルダを作成
-                            showNewFolderDialog(templateText)
-                        }
-                        which == folderArray.size - 1 -> {
-                            // フォルダを選択しない
-                            addTemplateWithFolder(templateText, null)
-                        }
-                        else -> {
-                            // 既存フォルダを選択
-                            addTemplateWithFolder(templateText, folderArray[which])
-                        }
-                    }
-                }
-                .setNegativeButton("キャンセル", null)
-                .show()
+            DialogHelper.showFolderSelectionDialog(
+                activity = this@MainActivity,
+                title = "フォルダを選択",
+                existingFolders = folders,
+                onNewFolderClick = { showNewFolderDialog(templateText) },
+                onFolderSelected = { folder -> addTemplateWithFolder(templateText, folder) }
+            )
         }
     }
 
     private fun showNewFolderDialog(templateText: String) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "作成"
+        ) { folderName ->
+            addTemplateWithFolder(templateText, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("作成") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    addTemplateWithFolder(templateText, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addTemplateWithFolder(text: String, folder: String?) {
@@ -528,13 +455,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                db.memoDao().update(updated)
-            }
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ、1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolder(folder)
 
             // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
@@ -560,58 +482,27 @@ class MainActivity : AppCompatActivity() {
     fun showFolderSelectionDialogForHistory(historyMemo: MemoEntity) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
-            val folders = db.memoDao().getFolders().toMutableList()
-            folders.add(0, "新しいフォルダを作成")
-            folders.add("フォルダを選択しない")
+            val folders = db.memoDao().getFolders()
 
-            val folderArray = folders.toTypedArray()
-
-            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                .setTitle("フォルダを選択")
-                .setItems(folderArray) { _, which ->
-                    when {
-                        which == 0 -> {
-                            // 新しいフォルダを作成
-                            showNewFolderDialogForHistory(historyMemo)
-                        }
-                        which == folderArray.size - 1 -> {
-                            // フォルダを選択しない
-                            addHistoryItemAsTemplate(historyMemo, null)
-                        }
-                        else -> {
-                            // 既存フォルダを選択
-                            addHistoryItemAsTemplate(historyMemo, folderArray[which])
-                        }
-                    }
-                }
-                .setNegativeButton("キャンセル", null)
-                .show()
+            DialogHelper.showFolderSelectionDialog(
+                activity = this@MainActivity,
+                title = "フォルダを選択",
+                existingFolders = folders,
+                onNewFolderClick = { showNewFolderDialogForHistory(historyMemo) },
+                onFolderSelected = { folder -> addHistoryItemAsTemplate(historyMemo, folder) }
+            )
         }
     }
 
     private fun showNewFolderDialogForHistory(historyMemo: MemoEntity) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "作成"
+        ) { folderName ->
+            addHistoryItemAsTemplate(historyMemo, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("作成") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    addHistoryItemAsTemplate(historyMemo, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addHistoryItemAsTemplate(historyMemo: MemoEntity, folder: String?) {
@@ -634,13 +525,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + 1)
-                db.memoDao().update(updated)
-            }
+            // 既存の定型文のdisplayOrderを1増やす（同じフォルダ内のみ、1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolder(folder)
 
             // 新規定型文をdisplayOrder=0で追加
             val newTemplate = MemoEntity(
@@ -673,58 +559,27 @@ class MainActivity : AppCompatActivity() {
     fun showFolderSelectionDialogForMove(templateMemo: MemoEntity) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
-            val folders = db.memoDao().getFolders().toMutableList()
-            folders.add(0, "新しいフォルダを作成")
-            folders.add("フォルダを選択しない")
+            val folders = db.memoDao().getFolders()
 
-            val folderArray = folders.toTypedArray()
-
-            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                .setTitle("移動先を選択")
-                .setItems(folderArray) { _, which ->
-                    when {
-                        which == 0 -> {
-                            // 新しいフォルダを作成
-                            showNewFolderDialogForMove(templateMemo)
-                        }
-                        which == folderArray.size - 1 -> {
-                            // フォルダを選択しない
-                            moveTemplateToFolder(templateMemo, null)
-                        }
-                        else -> {
-                            // 既存フォルダを選択
-                            moveTemplateToFolder(templateMemo, folderArray[which])
-                        }
-                    }
-                }
-                .setNegativeButton("キャンセル", null)
-                .show()
+            DialogHelper.showFolderSelectionDialog(
+                activity = this@MainActivity,
+                title = "移動先を選択",
+                existingFolders = folders,
+                onNewFolderClick = { showNewFolderDialogForMove(templateMemo) },
+                onFolderSelected = { folder -> moveTemplateToFolder(templateMemo, folder) }
+            )
         }
     }
 
     private fun showNewFolderDialogForMove(templateMemo: MemoEntity) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "作成"
+        ) { folderName ->
+            moveTemplateToFolder(templateMemo, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("作成") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    moveTemplateToFolder(templateMemo, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun moveTemplateToFolder(templateMemo: MemoEntity, folder: String?) {
@@ -795,58 +650,27 @@ class MainActivity : AppCompatActivity() {
     private fun showFolderSelectionDialogForMultiple(historyMemos: List<MemoEntity>) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
-            val folders = db.memoDao().getFolders().toMutableList()
-            folders.add(0, "新しいフォルダを作成")
-            folders.add("フォルダを選択しない")
+            val folders = db.memoDao().getFolders()
 
-            val folderArray = folders.toTypedArray()
-
-            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                .setTitle("フォルダを選択（${historyMemos.size}件）")
-                .setItems(folderArray) { _, which ->
-                    when {
-                        which == 0 -> {
-                            // 新しいフォルダを作成
-                            showNewFolderDialogForMultiple(historyMemos)
-                        }
-                        which == folderArray.size - 1 -> {
-                            // フォルダを選択しない
-                            addMultipleHistoryItemsAsTemplate(historyMemos, null)
-                        }
-                        else -> {
-                            // 既存フォルダを選択
-                            addMultipleHistoryItemsAsTemplate(historyMemos, folderArray[which])
-                        }
-                    }
-                }
-                .setNegativeButton("キャンセル", null)
-                .show()
+            DialogHelper.showFolderSelectionDialog(
+                activity = this@MainActivity,
+                title = "フォルダを選択（${historyMemos.size}件）",
+                existingFolders = folders,
+                onNewFolderClick = { showNewFolderDialogForMultiple(historyMemos) },
+                onFolderSelected = { folder -> addMultipleHistoryItemsAsTemplate(historyMemos, folder) }
+            )
         }
     }
 
     private fun showNewFolderDialogForMultiple(historyMemos: List<MemoEntity>) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "作成"
+        ) { folderName ->
+            addMultipleHistoryItemsAsTemplate(historyMemos, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("作成") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    addMultipleHistoryItemsAsTemplate(historyMemos, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun addMultipleHistoryItemsAsTemplate(historyMemos: List<MemoEntity>, folder: String?) {
@@ -859,15 +683,8 @@ class MainActivity : AppCompatActivity() {
             var addedCount = 0
             var skippedCount = 0
 
-            // 既存の定型文のdisplayOrderを取得（最大値）
-            val templatesInFolder = db.memoDao().getAllMemos()
-                .filter { it.isTemplate && it.folder == folder }
-
-            // 全ての既存定型文のdisplayOrderを履歴件数分増やす
-            templatesInFolder.forEach { memo ->
-                val updated = memo.copy(displayOrder = memo.displayOrder + historyMemos.size)
-                db.memoDao().update(updated)
-            }
+            // 全ての既存定型文のdisplayOrderを履歴件数分増やす（1クエリで一括更新）
+            db.memoDao().incrementTemplateDisplayOrderInFolderBy(folder, historyMemos.size)
 
             historyMemos.forEachIndexed { index, historyMemo ->
                 // 重複チェック
@@ -925,6 +742,7 @@ class MainActivity : AppCompatActivity() {
             val allMemos = db.memoDao().getAllMemos()
 
             // 選択内容からテンプレートIDを抽出
+            @Suppress("UNCHECKED_CAST")
             val selectedMemos = if (selectedItems.first() is String) {
                 // フォルダ一覧の場合：Set<String> ("template:id"形式)
                 val templateIds = (selectedItems as Set<String>)
@@ -949,58 +767,27 @@ class MainActivity : AppCompatActivity() {
     private fun showFolderSelectionDialogForMoveMultiple(templates: List<MemoEntity>) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(applicationContext)
-            val folders = db.memoDao().getFolders().toMutableList()
-            folders.add(0, "新しいフォルダを作成")
-            folders.add("フォルダを選択しない")
+            val folders = db.memoDao().getFolders()
 
-            val folderArray = folders.toTypedArray()
-
-            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                .setTitle("フォルダを選択（${templates.size}件）")
-                .setItems(folderArray) { _, which ->
-                    when {
-                        which == 0 -> {
-                            // 新しいフォルダを作成
-                            showNewFolderDialogForMoveMultiple(templates)
-                        }
-                        which == folderArray.size - 1 -> {
-                            // フォルダを選択しない
-                            moveMultipleTemplates(templates, null)
-                        }
-                        else -> {
-                            // 既存フォルダを選択
-                            moveMultipleTemplates(templates, folderArray[which])
-                        }
-                    }
-                }
-                .setNegativeButton("キャンセル", null)
-                .show()
+            DialogHelper.showFolderSelectionDialog(
+                activity = this@MainActivity,
+                title = "フォルダを選択（${templates.size}件）",
+                existingFolders = folders,
+                onNewFolderClick = { showNewFolderDialogForMoveMultiple(templates) },
+                onFolderSelected = { folder -> moveMultipleTemplates(templates, folder) }
+            )
         }
     }
 
     private fun showNewFolderDialogForMoveMultiple(templates: List<MemoEntity>) {
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setPadding(50, 40, 50, 40)
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "新しいフォルダを作成",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "作成"
+        ) { folderName ->
+            moveMultipleTemplates(templates, folderName)
         }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新しいフォルダを作成")
-            .setView(editText)
-            .setPositiveButton("作成") { _, _ ->
-                val folderName = editText.text.toString().trim()
-                if (folderName.isNotEmpty()) {
-                    moveMultipleTemplates(templates, folderName)
-                }
-            }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
     }
 
     private fun moveMultipleTemplates(templates: List<MemoEntity>, folder: String?) {
@@ -1146,6 +933,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         // フォルダ一覧：フォルダが含まれている場合は非活性に
                         val selectedItems = templateFragment?.getSelectedItems()
+                        @Suppress("UNCHECKED_CAST")
                         val hasFolder = (selectedItems as? Set<String>)?.any { it.startsWith("folder:") } == true
                         addToTemplateButton.isEnabled = !hasFolder
                         addToTemplateButton.alpha = if (hasFolder) 0.3f else 1.0f
@@ -1215,29 +1003,17 @@ class MainActivity : AppCompatActivity() {
         val templateFragment = supportFragmentManager.findFragmentByTag("f1") as? TemplateFragment
         val currentFolderName = templateFragment?.getCurrentFolderName() ?: return
 
-        val editText = android.widget.EditText(this).apply {
-            hint = "新しいフォルダ名"
-            setText(currentFolderName)
-            setPadding(50, 40, 50, 40)
-        }
-
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("フォルダ名を変更")
-            .setView(editText)
-            .setPositiveButton("変更") { _, _ ->
-                val newFolderName = editText.text.toString().trim()
-                if (newFolderName.isNotEmpty() && newFolderName != currentFolderName) {
-                    templateFragment.renameFolder(currentFolderName, newFolderName)
-                }
+        DialogHelper.showEditTextDialog(
+            activity = this,
+            title = "フォルダ名を変更",
+            hint = "新しいフォルダ名",
+            positiveButtonText = "変更",
+            initialText = currentFolderName
+        ) { newFolderName ->
+            if (newFolderName != currentFolderName) {
+                templateFragment.renameFolder(currentFolderName, newFolderName)
             }
-            .setNegativeButton("キャンセル", null)
-            .show()
-
-        // キーボード自動展開
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-        editText.requestFocus()
-        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(editText, android.view.inputmethod.InputMethodManager.SHOW_FORCED)
+        }
     }
 
     private fun showSearchBar() {
@@ -1356,30 +1132,70 @@ class MainActivity : AppCompatActivity() {
     // バナー広告を読み込む
     private fun loadBannerAd() {
         val adContainer = findViewById<FrameLayout>(R.id.adBannerContainer)
+        bannerAdView = AdHelper.loadBannerAd(this, adContainer)
+    }
 
-        // AdViewを作成
-        bannerAdView = AdView(this).apply {
-            adUnitId = "ca-app-pub-5377681981369299/6584173262" // 本番バナー広告ID
-            setAdSize(getAdaptiveBannerAdSize())
+    /**
+     * App Open Ad が閉じられた（または表示されなかった）時に呼ばれる
+     * MyApplication から呼び出される
+     */
+    fun onAppOpenAdDismissed() {
+        Log.d("MainActivity", "onAppOpenAdDismissed called, isColdStart: $isColdStart")
+        if (isColdStart) {
+            isColdStart = false
+            showFirstLaunchDialog()
+        }
+    }
+
+    private fun showFirstLaunchDialog() {
+        val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
+        if (prefs.getBoolean("hide_first_launch_dialog", false)) return
+
+        val message = """
+            
+            ・履歴や定型文を直接入力できる専用キーボードがご利用できます。
+            
+            ・ご利用にはキーボードの初回有効化が必要です。
+
+            ※このアプリはデータの収集・送信を一切行いませんのでご安心ください。
+
+
+            設定を有効化しますか？
+            
+        """.trimIndent()
+
+        val checkBox = android.widget.CheckBox(this).apply {
+            text = "今後表示しない"
+        }
+        val checkBoxContainer = android.widget.FrameLayout(this).apply {
+            setPadding(48, 50, 48, 50)
+            addView(checkBox)
         }
 
-        // AdViewをコンテナに追加
-        adContainer.removeAllViews()
-        adContainer.addView(bannerAdView)
+        val title = android.text.SpannableString("●専用キーボードについて").apply {
+            setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, length, 0)
+        }
 
-        // 広告を読み込む
-        val adRequest = AdRequest.Builder().build()
-        bannerAdView?.loadAd(adRequest)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setView(checkBoxContainer)
+            .setNegativeButton("今は設定しない") { _, _ ->
+                if (checkBox.isChecked) {
+                    prefs.edit().putBoolean("hide_first_launch_dialog", true).apply()
+                }
+            }
+            .setPositiveButton("設定画面に移動") { _, _ ->
+                if (checkBox.isChecked) {
+                    prefs.edit().putBoolean("hide_first_launch_dialog", true).apply()
+                }
+                startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+            }
+            .show()
     }
 
-    // アダプティブバナーのサイズを取得
-    private fun getAdaptiveBannerAdSize(): AdSize {
-        val displayMetrics = resources.displayMetrics
-        val adWidthPixels = displayMetrics.widthPixels.toFloat()
-        val density = displayMetrics.density
-        val adWidth = (adWidthPixels / density).toInt()
-
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+    override fun onDestroy() {
+        bannerAdView?.destroy()
+        super.onDestroy()
     }
-
 }

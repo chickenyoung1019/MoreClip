@@ -1,0 +1,169 @@
+# 既知の問題と対応方針
+
+最終レビュー日: 2026-01-21
+
+このファイルは、コードレビューで発見された問題と対応状況を管理します。
+対応したら `[ ]` を `[x]` に変更してください。
+
+---
+
+## 緊急度：高（すぐ直すべき）
+
+### [x] ID-05: IMEのCoroutineScopeリーク ✅ 対応済み
+- **ファイル**: `ClipboardIMEService.kt:21`
+- **問題**: サービス終了時にCoroutineScopeがキャンセルされていない
+- **対応日**: 2026-01-21
+- **対応内容**: `onDestroy()`を追加し、`serviceScope.cancel()`を実行
+
+### [x] ID-06: AdViewのメモリリーク ✅ 対応済み
+- **ファイル**:
+  - `MainActivity.kt`
+  - `ClipboardSettingsActivity.kt`
+  - `TemplateSettingsActivity.kt`
+- **問題**: Activity終了時にAdViewが破棄されていない
+- **対応日**: 2026-01-21
+- **対応内容**: 各Activityに`onDestroy()`を追加し、`bannerAdView?.destroy()`を実行
+
+### [x] ID-14: データベースマイグレーション ✅ 対応済み
+- **ファイル**: `AppDatabase.kt`
+- **問題**: `fallbackToDestructiveMigration()`使用でデータ消失リスク
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - `fallbackToDestructiveMigration()`を削除
+  - Migrationの書き方をコメントで明記
+  - CLAUDE.mdにスキーマ変更手順を追記
+
+---
+
+## 緊急度：中（近いうちに直すべき）
+
+### [x] ID-01: notifyDataSetChanged()の乱用 ✅ 対応済み
+- **ファイル**:
+  - `ClipboardAdapter.kt`
+  - `TemplateAdapter.kt`
+  - `FolderContentAdapter.kt`
+  - `IMETemplateAdapter.kt`
+- **問題**: リスト全体を再描画するため非効率
+- **対応日**: 2026-01-22
+- **対応内容**:
+  - 各AdapterにDiffUtilコールバックを実装
+  - updateData()でDiffUtil.calculateDiff()を使用
+  - モード切替時はnotifyItemRangeChanged()に変更
+  - 選択切替時はnotifyItemChanged()で個別更新
+
+### [x] ID-03: Deprecated API使用 ✅ 対応済み
+- **ファイル**:
+  - `MainActivity.kt`
+  - `ClipboardSettingsActivity.kt`
+  - `TemplateSettingsActivity.kt`
+- **問題**:
+  - `SYSTEM_UI_FLAG_LIGHT_STATUS_BAR` (API 30で非推奨)
+  - `onBackPressed()` (API 33で非推奨)
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - ステータスバー: `WindowInsetsControllerCompat`に変更
+  - バックボタン: `OnBackPressedCallback`に変更
+
+### [x] ID-02: 未使用のプロパティ ✅ 対応済み
+- **ファイル**: `TemplateFragment.kt`
+- **問題**: `backButton: View`が宣言のみで未使用
+- **対応日**: 2026-01-21
+- **対応内容**: 未使用の`backButton`プロパティを削除
+
+---
+
+## 緊急度：低（余裕があれば）
+
+### [x] ID-10: バナー広告コードの重複 ✅ 対応済み
+- **ファイル**: `AdHelper.kt`（新規作成）
+- **問題**: 同じコードが3箇所にコピペされていた
+- **対応日**: 2026-01-21
+- **対応内容**: `AdHelper.kt`を作成し、3つのActivityから共通利用
+
+### [ ] ID-11: Adapter選択モードの重複
+- **ファイル**:
+  - `ClipboardAdapter.kt:127-197`
+  - `FolderContentAdapter.kt:124-193`
+- **問題**: 選択モードのロジックがほぼ同一
+- **影響**: 同じ修正を2箇所に行う必要
+- **修正方法**: 共通インターフェースまたは抽象クラスで共通化
+- **備考**: CLAUDE.mdの「保守性優先」に反するが、現状動いているなら優先度低
+
+### [x] ID-12: ダイアログ表示パターンの重複 ✅ 対応済み
+- **ファイル**: `DialogHelper.kt`（新規作成）、`MainActivity.kt`
+- **問題**: フォルダ選択・作成ダイアログが多数重複
+- **対応日**: 2026-01-22
+- **対応内容**:
+  - `DialogHelper.kt`を作成（EditText入力ダイアログ、フォルダ選択ダイアログを共通化）
+  - MainActivity.kt内の13箇所のダイアログをDialogHelper呼び出しに置き換え
+
+### [ ] ID-13: MainActivityの肥大化
+- **ファイル**: `MainActivity.kt` (1385行)
+- **問題**: 1ファイルに多くの責務が集中
+- **影響**: 読みづらい、修正しにくい
+- **対応方針**:
+  - 急いで分割する必要はない
+  - 新機能追加時に少しずつ分離していく
+  - まずはダイアログ系を`DialogHelper.kt`に移動するのがおすすめ
+
+### [x] ID-04: Uncheckedキャスト ✅ 対応済み
+- **ファイル**: `MainActivity.kt`
+- **問題**: `as Set<Int>`等の安全性チェックなしキャスト
+- **対応日**: 2026-01-21
+- **対応内容**: `@Suppress("UNCHECKED_CAST")`を追加して警告を抑制
+
+### [x] ID-07: ActivityLifecycleCallbacksの二重登録 ✅ 対応済み
+- **ファイル**: `AppOpenAdManager.kt`, `MyApplication.kt`
+- **問題**: 同じイベントに対して2つのコールバック
+- **対応日**: 2026-01-21
+- **対応内容**:
+  - AppOpenAdManagerからActivityLifecycleCallbacks実装を削除
+  - MyApplicationに一元化、showAdIfAvailable()にActivityを引数で渡す形式に変更
+
+### [x] ID-08: DBアクセスの非効率（ループ内個別更新） ✅ 対応済み
+- **ファイル**: `MemoDao.kt`, `MainActivity.kt`, `ProcessTextActivity.kt`, `ClipboardFragment.kt`, `TemplateFragment.kt`
+- **問題**: ループ内で1件ずつ`update()`を呼び出し
+- **対応日**: 2026-01-22
+- **対応内容**:
+  - MemoDao.ktにバッチ処理メソッドを追加:
+    - `updateAll()`, `deleteAll()` - バッチ更新/削除
+    - `incrementHistoryDisplayOrderExcept()` - 履歴の順序更新
+    - `incrementAllHistoryDisplayOrder()` - 全履歴の順序更新
+    - `incrementTemplateDisplayOrderInFolder()` - フォルダ内定型文の順序更新
+    - `renameFolder()` - フォルダ名一括変更
+    - `deleteTemplatesInFolder()` - フォルダ内定型文一括削除
+  - 各ファイルのforEachループをバッチ処理呼び出しに置き換え
+
+### [x] ID-09: 広告IDのハードコーディング ✅ 対応済み
+- **ファイル**: `AdHelper.kt`
+- **問題**: 広告ユニットIDが複数ファイルに分散
+- **対応日**: 2026-01-21
+- **対応内容**: AdHelper.ktでバナー広告IDを一元管理（ID-10と同時対応）
+
+### [x] ID-15: 例外のログ出力不足 ✅ 対応済み
+- **ファイル**: `TemplateFragment.kt`
+- **問題**: JSONパース例外でログ出力なし
+- **対応日**: 2026-01-21
+- **対応内容**: `Log.e()`を追加してエラー内容を出力
+
+---
+
+## 対応完了した問題
+
+対応したらここに移動してください。
+
+```
+### [x] ID-XX: 問題名
+- 対応日: YYYY-MM-DD
+- 対応内容: 〇〇を修正
+```
+
+---
+
+## 参考: CLAUDE.mdとの整合性
+
+| 問題 | CLAUDE.mdとの整合性 |
+|-----|-------------------|
+| ID-14 (fallback) | CLAUDE.mdに「使用中」と明記済み。開発中は現状維持 |
+| ID-10, 11, 12 (重複) | 「保守性優先」に合致。ただし動作中なら急がない |
+| ID-13 (肥大化) | 分離は方針に合致。段階的に対応 |

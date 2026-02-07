@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,7 +24,6 @@ class TemplateFragment : Fragment() {
     private lateinit var emptyText: TextView
     private lateinit var adapter: TemplateAdapter
     private var currentFolder: String? = null  // null = フォルダ一覧表示中
-    private lateinit var backButton: View  // 戻るボタン（後で追加）
     private var folderContentAdapter: FolderContentAdapter? = null
     private var allTemplateItems: List<TemplateItem> = emptyList()
     private var allFolderMemos: List<MemoEntity> = emptyList()
@@ -66,6 +66,9 @@ class TemplateFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         loadMemos()
+        // 設定変更を反映するため強制再描画
+        adapter.notifyDataSetChanged()
+        folderContentAdapter?.notifyDataSetChanged()
     }
 
     fun loadMemos() {
@@ -249,12 +252,8 @@ class TemplateFragment : Fragment() {
     fun renameFolder(oldName: String, newName: String) {
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(requireContext())
-            // フォルダ内の定型文をすべて取得して、folderフィールドを更新
-            val templates = db.memoDao().getTemplatesByFolder(oldName)
-            templates.forEach { template ->
-                val updated = template.copy(folder = newName)
-                db.memoDao().update(updated)
-            }
+            // フォルダ名を一括変更（1クエリで実行）
+            db.memoDao().renameFolder(oldName, newName)
 
             // ヘッダータイトル更新
             (activity as? MainActivity)?.showFolderMode(newName)
@@ -340,9 +339,8 @@ class TemplateFragment : Fragment() {
                         val allMemos = db.memoDao().getAllMemos()
                         val memosToDelete = allMemos.filter { (selectedIds as Set<Int>).contains(it.id) }
 
-                        memosToDelete.forEach { memo ->
-                            db.memoDao().delete(memo)
-                        }
+                        // バッチ削除（1クエリで実行）
+                        db.memoDao().deleteAll(memosToDelete)
 
                         folderContentAdapter?.exitSelectMode()
                         loadMemos()
@@ -367,21 +365,22 @@ class TemplateFragment : Fragment() {
                     lifecycleScope.launch {
                         val db = AppDatabase.getDatabase(requireContext())
 
-                        selectedKeys.forEach { key ->
-                            when {
-                                key.startsWith("folder:") -> {
-                                    val folderName = key.removePrefix("folder:")
-                                    // フォルダ内の定型文を全削除
-                                    val templatesInFolder = db.memoDao().getTemplatesByFolder(folderName)
-                                    templatesInFolder.forEach { db.memoDao().delete(it) }
-                                }
-                                key.startsWith("template:") -> {
-                                    val templateId = key.removePrefix("template:").toInt()
-                                    val allMemos = db.memoDao().getAllMemos()
-                                    val memo = allMemos.find { it.id == templateId }
-                                    memo?.let { db.memoDao().delete(it) }
-                                }
-                            }
+                        // フォルダ名と定型文IDを分離
+                        val folderNames = selectedKeys.filter { it.startsWith("folder:") }
+                            .map { it.removePrefix("folder:") }
+                        val templateIds = selectedKeys.filter { it.startsWith("template:") }
+                            .map { it.removePrefix("template:").toInt() }
+
+                        // フォルダ内の定型文を一括削除（各フォルダ1クエリ）
+                        folderNames.forEach { folderName ->
+                            db.memoDao().deleteTemplatesInFolder(folderName)
+                        }
+
+                        // 個別の定型文を一括削除
+                        if (templateIds.isNotEmpty()) {
+                            val allMemos = db.memoDao().getAllMemos()
+                            val memosToDelete = allMemos.filter { templateIds.contains(it.id) }
+                            db.memoDao().deleteAll(memosToDelete)
                         }
 
                         adapter.exitSelectMode()
@@ -437,9 +436,8 @@ class TemplateFragment : Fragment() {
                 .setMessage("フォルダ「$folderName」と中の定型文${templates.size}件を削除しますか？")
                 .setPositiveButton("削除") { _, _ ->
                     lifecycleScope.launch {
-                        templates.forEach { template ->
-                            db.memoDao().delete(template)
-                        }
+                        // フォルダ内の定型文を一括削除（1クエリで実行）
+                        db.memoDao().deleteTemplatesInFolder(folderName)
                         loadMemos()
                         android.widget.Toast.makeText(
                             requireContext(),
@@ -522,22 +520,18 @@ class TemplateFragment : Fragment() {
                         .map { it.name }
                     saveFolderOrder(folderOrder)
 
-                    // 定型文の順序を保存
-                    var order = 0
-                    currentList.forEach { item ->
-                        if (item is TemplateItem.Template) {
-                            val updated = item.memo.copy(displayOrder = order)
-                            db.memoDao().update(updated)
-                            order++
-                        }
-                    }
+                    // 定型文の順序を保存（バッチ更新）
+                    val updatedTemplates = currentList
+                        .filterIsInstance<TemplateItem.Template>()
+                        .mapIndexed { index, item -> item.memo.copy(displayOrder = index) }
+                    db.memoDao().updateAll(updatedTemplates)
                 } else {
-                    // フォルダ内モード
+                    // フォルダ内モード（バッチ更新）
                     val currentList = folderContentAdapter?.getCurrentList() ?: emptyList()
-                    currentList.forEachIndexed { index, memo ->
-                        val updated = memo.copy(displayOrder = index)
-                        db.memoDao().update(updated)
+                    val updatedMemos = currentList.mapIndexed { index, memo ->
+                        memo.copy(displayOrder = index)
                     }
+                    db.memoDao().updateAll(updatedMemos)
                 }
                 loadMemos()
                 android.widget.Toast.makeText(requireContext(), "並び替えを保存しました", android.widget.Toast.LENGTH_SHORT).show()
@@ -574,6 +568,7 @@ class TemplateFragment : Fragment() {
             val jsonArray = org.json.JSONArray(json)
             (0 until jsonArray.length()).map { jsonArray.getString(it) }
         } catch (e: Exception) {
+            Log.e("TemplateFragment", "フォルダ順序の読み込みに失敗: ${e.message}")
             emptyList()
         }
     }

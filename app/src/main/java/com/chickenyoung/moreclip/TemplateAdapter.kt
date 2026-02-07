@@ -239,22 +239,31 @@ class TemplateAdapter(
 
         if (selectedItems.isEmpty()) {
             exitSelectMode()
+        } else {
+            // 選択状態が変わったアイテムのみ更新
+            val position = items.indexOfFirst { item ->
+                when (item) {
+                    is TemplateItem.Folder -> "folder:${item.name}" == itemKey
+                    is TemplateItem.Template -> "template:${item.memo.id}" == itemKey
+                }
+            }
+            if (position >= 0) {
+                notifyItemChanged(position)
+            }
         }
-
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
     fun enterSelectMode() {
         isSelectMode = true
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun exitSelectMode() {
         isSelectMode = false
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun selectAll() {
@@ -265,14 +274,13 @@ class TemplateAdapter(
                 is TemplateItem.Template -> selectedItems.add("template:${item.memo.id}")
             }
         }
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
         onSelectionChanged(selectedItems)
     }
 
     fun deselectAll() {
         selectedItems.clear()
         exitSelectMode()
-        notifyDataSetChanged()
         onSelectionChanged(selectedItems)
     }
 
@@ -288,12 +296,12 @@ class TemplateAdapter(
     // 並び替えモード
     fun enterReorderMode() {
         isReorderMode = true
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun exitReorderMode() {
         isReorderMode = false
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {
@@ -305,4 +313,5 @@ class TemplateAdapter(
     }
 
     fun getCurrentList(): List<TemplateItem> = items
+
 }
